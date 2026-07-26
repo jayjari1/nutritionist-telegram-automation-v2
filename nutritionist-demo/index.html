@@ -1,0 +1,3299 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>NutriCoach — App Demo</title>
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── WhatsApp-style Chat Layout ─────────────────────────── */
+    .chat-screen-layout {
+      /* display:flex is handled by .screen.active — do NOT set it here */
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .chat-messages-area {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 16px;
+      gap: 6px;
+      /* Space for bottom nav + input bar */
+      padding-bottom: 16px;
+      scroll-behavior: smooth;
+    }
+
+    .chat-messages-area::-webkit-scrollbar { width: 0; }
+
+    .chat-input-bar {
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+      padding: 10px 12px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .chat-input-field {
+      flex: 1;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 10px 16px;
+      font-size: 15px;
+      font-family: var(--font-family);
+      color: var(--text-primary);
+      outline: none;
+      resize: none;
+      min-height: 42px;
+      max-height: 100px;
+      line-height: 1.4;
+      transition: border-color 0.15s;
+    }
+
+    .chat-input-field:focus { border-color: var(--accent-green); }
+    .chat-input-field::placeholder { color: var(--text-tertiary); }
+
+    .chat-send-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.15s ease;
+    }
+
+    .chat-send-btn:hover { background: var(--accent-green-dim); transform: scale(1.05); }
+    .chat-send-btn:active { transform: scale(0.95); }
+    .chat-send-btn svg { width: 18px; height: 18px; fill: white; }
+
+    /* ── Improved Bubble Styles ──────────────────────────────── */
+    .msg-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+
+    .msg-row.incoming { justify-content: flex-start; }
+    .msg-row.outgoing { justify-content: flex-end; }
+
+    .msg-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: white;
+      flex-shrink: 0;
+      margin-bottom: 2px;
+    }
+
+    .msg-avatar.purple { background: linear-gradient(135deg, #A78BFA, #7C3AED); }
+    .msg-avatar.blue   { background: linear-gradient(135deg, #5B9CF6, #2563EB); }
+    .msg-avatar.hidden { opacity: 0; pointer-events: none; }
+
+    .msg-bubble-wrap {
+      display: flex;
+      flex-direction: column;
+      max-width: 75%;
+      gap: 2px;
+    }
+
+    .msg-sender-name {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 0 12px;
+      margin-bottom: 2px;
+    }
+
+    .msg-incoming-name { color: var(--accent-green); }
+    .msg-caretaker-name { color: var(--color-purple); }
+    .msg-nutritionist-name { color: var(--color-info); }
+
+    .msg-bubble {
+      padding: 9px 13px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text-primary);
+      word-break: break-word;
+      position: relative;
+    }
+
+    /* Incoming (AI / Bot) — left, green tint */
+    .msg-row.incoming .msg-bubble {
+      background: var(--accent-green-soft);
+      border: 1px solid rgba(76, 175, 130, 0.18);
+      border-bottom-left-radius: 4px;
+    }
+
+    /* Outgoing (Client) — right, default */
+    .msg-row.outgoing .msg-bubble {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-bottom-right-radius: 4px;
+    }
+
+    /* Caretaker — right, purple tint */
+    .msg-row.caretaker-msg .msg-bubble {
+      background: var(--color-purple-bg);
+      border: 1px solid rgba(167, 139, 250, 0.18);
+      border-bottom-right-radius: 4px;
+    }
+
+    /* Nutritionist — right, blue tint */
+    .msg-row.nutritionist-msg .msg-bubble {
+      background: var(--color-info-bg);
+      border: 1px solid rgba(91, 156, 246, 0.18);
+      border-bottom-right-radius: 4px;
+    }
+
+    .msg-time {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      padding: 0 12px;
+      align-self: flex-end;
+    }
+
+    .msg-row.outgoing .msg-bubble-wrap { align-items: flex-end; }
+    .msg-row.incoming .msg-bubble-wrap { align-items: flex-start; }
+
+    /* Date separator */
+    .date-sep {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-tertiary);
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-pill);
+      padding: 4px 12px;
+      align-self: center;
+      margin: 8px 0;
+      font-weight: 500;
+    }
+
+    /* Today tab inside profile — needs full height */
+    #tab-today {
+      display: none;
+      flex-direction: column;
+      height: calc(100vh - var(--top-bar-height) - 48px - var(--nav-height));
+      overflow: hidden;
+    }
+
+    #tab-today.active { display: flex; }
+
+    .tab-chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      scroll-behavior: smooth;
+    }
+
+    .tab-chat-messages::-webkit-scrollbar { width: 0; }
+
+    /* Summary card inside today tab - stays at bottom of chat */
+    .today-summary-bar {
+      flex-shrink: 0;
+      padding: 10px 16px;
+      background: var(--bg-tertiary);
+      border-top: 1px solid var(--border-color);
+    }
+
+    .today-note-bar {
+      flex-shrink: 0;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+      padding: 10px 12px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .today-note-input {
+      flex: 1;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-family: var(--font-family);
+      color: var(--text-primary);
+      outline: none;
+    }
+
+    .today-note-input::placeholder { color: var(--text-tertiary); }
+    .today-note-input:focus { border-color: var(--accent-green); }
+    /* Screen-specific overrides */
+    .role-screen {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      gap: 32px;
+    }
+    .role-screen .logo { font-size: 48px; margin-bottom: 8px; }
+    .role-screen h1 { font-size: 26px; font-weight: 800; text-align: center; }
+    .role-screen p { font-size: 14px; color: var(--text-secondary); text-align: center; }
+    .role-cards { display: flex; gap: 16px; width: 100%; }
+
+    .profile-hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 16px;
+      gap: 10px;
+      text-align: center;
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 10px;
+      padding: 0 16px;
+      margin-bottom: 16px;
+    }
+
+    .quick-actions {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .quick-action-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-md);
+      padding: 12px 8px;
+      cursor: pointer;
+      border: none;
+      font-family: var(--font-family);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .quick-action-btn:hover { background: var(--bg-elevated); color: var(--accent-green); }
+    .quick-action-btn .qa-icon { font-size: 20px; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Add client steps */
+    .step-content { display: none; padding: 16px; }
+    .step-content.active { display: block; }
+
+    /* Settings section */
+    .settings-section {
+      background: var(--bg-secondary);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-color);
+      padding: 0 16px;
+      margin-bottom: 16px;
+    }
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border-color);
+      cursor: pointer;
+    }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-label { font-size: 15px; color: var(--text-primary); }
+    .settings-value { font-size: 14px; color: var(--text-tertiary); }
+
+    /* Client home cards */
+    .checkin-card {
+      background: linear-gradient(135deg, var(--accent-green-soft), transparent);
+      border: 1px solid rgba(76, 175, 130, 0.3);
+      border-radius: var(--radius-xl);
+      padding: 20px;
+      margin: 0 16px 16px;
+    }
+
+    .progress-dots {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin: 12px 0;
+    }
+    .progress-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--bg-tertiary);
+    }
+    .progress-dot.done { background: var(--accent-green); }
+    .progress-dot.missed { background: var(--color-danger); opacity: 0.5; }
+
+    /* Subscription bar */
+    .sub-progress-wrap {
+      margin: 6px 0;
+    }
+
+    /* Notification badge */
+    .notif-badge {
+      position: relative;
+    }
+    .notif-badge::after {
+      content: '2';
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: var(--color-danger);
+      color: white;
+      font-size: 9px;
+      font-weight: 700;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .view-switcher {
+      position: fixed;
+      bottom: calc(var(--nav-height) + 12px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-color-strong);
+      border-radius: var(--radius-pill);
+      padding: 4px;
+      display: flex;
+      gap: 2px;
+      z-index: 300;
+      box-shadow: var(--shadow-lg);
+      font-size: 11px;
+    }
+    .view-switcher button {
+      padding: 5px 12px;
+      border-radius: var(--radius-pill);
+      border: none;
+      background: transparent;
+      color: var(--text-tertiary);
+      font-size: 11px;
+      font-family: var(--font-family);
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .view-switcher button.active {
+      background: var(--accent-green);
+      color: white;
+    }
+
+    /* Chart tooltip dark fix */
+    .chartjs-tooltip { opacity: 0.9; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- THEME TOGGLE                                               -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+  <span id="theme-icon">☀️</span>
+</button>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- APP CONTAINER                                              -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="app">
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- SCREEN 0: ROLE SELECTOR                                    -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<section class="screen active" id="screen-role">
+  <div class="role-screen">
+    <div>
+      <div class="logo" style="text-align:center">🥗</div>
+      <h1>NutriCoach</h1>
+      <p style="margin-top:8px">AI-Powered Nutrition Accountability</p>
+      <p style="margin-top:4px; font-size:12px; color:var(--text-tertiary)">Demo — Choose your view to explore</p>
+    </div>
+
+    <div class="role-cards">
+      <div class="role-card" onclick="goTo('screen-n-login')">
+        <div class="role-icon">🩺</div>
+        <div style="font-size:15px; font-weight:700; color:var(--text-primary); margin-bottom:6px">Nutritionist Portal</div>
+        <div style="font-size:12px; color:var(--text-secondary)">Sign in / Sign up to manage clients & AI rules</div>
+      </div>
+      <div class="role-card" style="border-color: rgba(167, 139, 250, 0.3); background: linear-gradient(135deg, rgba(167, 139, 250, 0.08), rgba(0,0,0,0))" onclick="goTo('screen-admin')">
+        <div class="role-icon">👑</div>
+        <div style="font-size:15px; font-weight:700; color:var(--color-purple); margin-bottom:6px">Platform Super-Admin</div>
+        <div style="font-size:12px; color:var(--text-secondary)">SaaS Owner View — Manage doctor accounts & billing</div>
+      </div>
+      <div class="role-card" onclick="goTo('screen-c-login')">
+        <div class="role-icon">👩</div>
+        <div style="font-size:15px; font-weight:700; color:var(--text-primary); margin-bottom:6px">Client App Demo</div>
+        <div style="font-size:12px; color:var(--text-secondary)">View check-ins, progress, streak & AI chat</div>
+      </div>
+    </div>
+
+    <div style="font-size:11px; color:var(--text-tertiary); text-align:center;">
+      ✨ Multi-Tenant SaaS Platform Demo — Choose a role to explore
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- N0: NUTRITIONIST LOGIN & SIGN UP SCREEN                    -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<section class="screen" id="screen-n-login">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-role')">←</button>
+    <div class="top-bar-center"><div class="top-bar-title">Nutritionist Portal</div></div>
+    <div style="width:36px"></div>
+  </div>
+
+  <div class="scroll-content">
+    <div style="padding:24px 20px; display:flex; flex-direction:column; align-items:center">
+      <div class="logo mb-sm" style="font-size:36px">🩺</div>
+      <div style="font-size:22px; font-weight:800; text-align:center">NutriCoach SaaS Pro</div>
+      <div style="font-size:13px; color:var(--text-secondary); text-align:center; margin-top:4px; margin-bottom:24px">
+        The complete AI automation platform for clinical nutritionists & dietitians.
+      </div>
+
+      <!-- Auth Tab Bar -->
+      <div class="filter-tabs w-full mb-md" style="padding:0; display:flex; width:100%; max-width:340px; background:var(--bg-tertiary); border-radius:var(--radius-pill); padding:4px">
+        <button class="filter-tab active flex-1" style="border-radius:var(--radius-pill); text-align:center; padding:8px; cursor:pointer" id="auth-tab-btn-signin" onclick="switchAuthTab('signin')">Sign In</button>
+        <button class="filter-tab flex-1" style="border-radius:var(--radius-pill); text-align:center; padding:8px; cursor:pointer" id="auth-tab-btn-signup" onclick="switchAuthTab('signup')">New Account (Sign Up)</button>
+      </div>
+
+      <!-- SIGN IN FORM -->
+      <div id="auth-form-signin" style="width:100%; max-width:340px">
+        <div class="input-group">
+          <label class="input-label">Email / Doctor ID</label>
+          <input class="input" type="text" value="dr.priya@nutricoach.ai" placeholder="Enter email..." />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Password</label>
+          <input class="input" type="password" value="••••••••••••" placeholder="Enter password..." />
+        </div>
+        <div style="display:flex; justify-content:flex-end; margin-bottom:16px">
+          <span style="font-size:12px; color:var(--accent-green); cursor:pointer" onclick="openForgotPasswordModal('nutritionist')">Forgot Password?</span>
+        </div>
+        <button class="btn btn-primary btn-full mb-md" style="font-size:15px; padding:14px; width:100%" onclick="doNutritionistLogin()">
+          🔒 Sign In to Dashboard →
+        </button>
+
+        <div style="text-align:center; position:relative; margin:20px 0; border-top:1px solid var(--border-color)">
+          <span style="background:var(--bg-primary); padding:0 10px; font-size:11px; color:var(--text-tertiary); position:relative; top:-9px">OR INSTANT DEMO</span>
+        </div>
+
+        <button class="btn btn-secondary btn-full" style="font-size:13px; padding:12px; border:1px solid var(--accent-green); width:100%" onclick="doNutritionistLogin()">
+          ⚡ Quick Demo Login (Dr. Priya Mehta)
+        </button>
+      </div>
+
+      <!-- SIGN UP FORM -->
+      <div id="auth-form-signup" style="width:100%; max-width:340px; display:none">
+        <div class="input-group">
+          <label class="input-label">Full Name *</label>
+          <input class="input" placeholder="e.g. Dr. Rahul Sharma" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Specialty / Qualification</label>
+          <input class="input" placeholder="e.g. Sports & Clinical Nutritionist" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Clinic / Brand Name</label>
+          <input class="input" placeholder="e.g. FitLife Wellness Clinic" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Work Email *</label>
+          <input class="input" placeholder="rahul@fitlife.ai" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Choose Password *</label>
+          <input class="input" type="password" placeholder="Min 8 characters..." />
+        </div>
+        <div style="font-size:11px; color:var(--text-tertiary); margin-bottom:16px; line-height:1.4">
+          ✨ Private Platform: All doctor registrations require manual Admin verification before account activation.
+        </div>
+        <button class="btn btn-primary btn-full mb-md" style="font-size:15px; padding:14px; width:100%" onclick="submitDoctorSignup()">
+          🚀 Submit Registration for Approval →
+        </button>
+      </div>
+
+      <div style="height:30px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- C0: CLIENT LOGIN SCREEN                                    -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<section class="screen" id="screen-c-login">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-role')">←</button>
+    <div class="top-bar-center"><div class="top-bar-title">Client Login</div></div>
+    <div style="width:36px"></div>
+  </div>
+
+  <div class="scroll-content">
+    <div style="padding:24px 20px; display:flex; flex-direction:column; align-items:center">
+      <div class="logo mb-sm" style="font-size:36px">🥗</div>
+      <div style="font-size:22px; font-weight:800; text-align:center">NutriCoach Client App</div>
+      <div style="font-size:13px; color:var(--text-secondary); text-align:center; margin-top:4px; margin-bottom:24px">
+        Log in to view your personalized plan, daily check-ins, and AI accountability chat.
+      </div>
+
+      <div style="width:100%; max-width:340px">
+        <div class="input-group">
+          <label class="input-label">Registered Phone Number / WhatsApp</label>
+          <input class="input" type="text" value="+91 98765 43210" placeholder="e.g. +91 98765 43210" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Password / Access PIN</label>
+          <input class="input" type="password" value="••••••••••••" placeholder="Enter access PIN..." />
+        </div>
+        <div style="display:flex; justify-content:flex-end; margin-bottom:16px">
+          <span style="font-size:12px; color:var(--accent-green); cursor:pointer" onclick="openForgotPasswordModal('client')">Forgot Password?</span>
+        </div>
+        <button class="btn btn-primary btn-full mb-md" style="font-size:15px; padding:14px; width:100%" onclick="showToast('✅ Welcome back, Ananya!'); goTo('screen-c-home')">
+          📲 Log In to My Plan →
+        </button>
+
+        <div style="text-align:center; position:relative; margin:20px 0; border-top:1px solid var(--border-color)">
+          <span style="background:var(--bg-primary); padding:0 10px; font-size:11px; color:var(--text-tertiary); position:relative; top:-9px">OR INSTANT DEMO</span>
+        </div>
+
+        <button class="btn btn-secondary btn-full" style="font-size:13px; padding:12px; border:1px solid var(--accent-green); width:100%" onclick="showToast('⚡ Logged in as demo client!'); goTo('screen-c-home')">
+          ⚡ Quick Demo Login (Ananya Sharma)
+        </button>
+      </div>
+
+      <div style="height:30px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- ADMIN: PLATFORM SUPER-ADMIN / SAAS OWNER VIEW              -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<section class="screen" id="screen-admin">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-role')">←</button>
+    <div class="top-bar-center">
+      <div class="top-bar-title">👑 SaaS Platform Admin</div>
+      <div class="top-bar-subtitle">Manage Nutritionist Subscriptions</div>
+    </div>
+    <button class="icon-btn" onclick="showToast('Admin settings coming soon')">⚙️</button>
+  </div>
+
+  <div class="scroll-content">
+    <div style="padding:16px">
+      <!-- Admin Overview Banner (Zero Money, Pure Status) -->
+      <div style="background:linear-gradient(135deg, #1E293B, #0F172A); padding:16px; border-radius:var(--radius-lg); border:1px solid rgba(255,255,255,0.1); color:white; margin-bottom:16px">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+          <span style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; opacity:0.7">Platform Status Overview</span>
+          <span class="badge badge-green" style="background:rgba(76,175,130,0.2); color:#4CAF82">🟢 Private SaaS Live</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; text-align:center">
+          <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:var(--radius-sm)">
+            <div style="font-size:20px; font-weight:800; color:#4CAF82">2</div>
+            <div style="font-size:10px; opacity:0.7">Active Doctors</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:var(--radius-sm)">
+            <div style="font-size:20px; font-weight:800; color:#F5A623">1</div>
+            <div style="font-size:10px; opacity:0.7">Pending Approval</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.05); padding:8px; border-radius:var(--radius-sm)">
+            <div style="font-size:20px; font-weight:800; color:#FF7676">1</div>
+            <div style="font-size:10px; opacity:0.7">Paused / Expired</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending Approvals Section -->
+      <div class="section-title mb-sm" style="color:var(--color-warning); display:flex; align-items:center; gap:6px">
+        <span>⏳ Pending Verifications</span>
+        <span class="badge badge-yellow" style="font-size:10px">Requires Action</span>
+      </div>
+      <div class="card mb-lg" id="admin-doc-pending" style="border:1px dashed var(--color-warning); background:var(--bg-primary)">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px">
+          <div style="display:flex; gap:10px; align-items:center">
+            <div class="avatar avatar-md avatar-orange">RS</div>
+            <div>
+              <div style="font-size:15px; font-weight:700">Dr. Rahul Sharma</div>
+              <div style="font-size:12px; color:var(--text-tertiary)">Sports Nutrition · FitLife Wellness Clinic</div>
+            </div>
+          </div>
+          <span class="badge badge-yellow" id="admin-badge-pending">⏳ Pending Approval</span>
+        </div>
+        <div style="background:var(--bg-tertiary); padding:10px; border-radius:var(--radius-md); font-size:12px; margin-bottom:12px">
+          <div style="color:var(--text-secondary); margin-bottom:4px"><strong>Registration Note:</strong> Signed up today via Web Portal. Requested access for 15 clinical athletes.</div>
+          <div style="color:var(--text-tertiary); font-size:11px">Work Email: rahul@fitlife.ai · Status: Verification Required</div>
+        </div>
+        <div style="display:flex; gap:10px" id="admin-pending-btn-row">
+          <button class="btn btn-sm btn-primary flex-1" style="font-size:12px; padding:8px" onclick="approveDoctorPending()">
+            ✅ Verify & Activate Account
+          </button>
+          <button class="btn btn-sm btn-ghost" style="color:var(--color-danger); font-size:12px; padding:8px" onclick="showToast('❌ Registration rejected.')">
+            ✕ Reject
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+        <div class="section-title">Verified Nutritionists</div>
+        <button class="btn btn-sm btn-primary" style="font-size:11px" onclick="showToast('Invite link copied to clipboard!')">＋ Invite Doctor</button>
+      </div>
+
+      <!-- Doctor Card 1: Dr Priya Mehta -->
+      <div class="card mb-md" id="admin-doc-1" style="border-left:4px solid var(--accent-green)">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px">
+          <div style="display:flex; gap:10px; align-items:center">
+            <div class="avatar avatar-md">PM</div>
+            <div>
+              <div style="font-size:15px; font-weight:700">Dr. Priya Mehta</div>
+              <div style="font-size:12px; color:var(--text-tertiary)">Clinical Nutritionist · 4 clients</div>
+            </div>
+          </div>
+          <span class="badge badge-green" id="admin-badge-1">✅ Active Access</span>
+        </div>
+        <div style="background:var(--bg-tertiary); padding:10px; border-radius:var(--radius-md); font-size:12px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+          <div>
+            <div style="font-weight:600; color:var(--text-primary)">Pro Clinical Access Tier</div>
+            <div style="color:var(--text-tertiary)">Deadline / Expiry: Aug 31, 2026 (55 days left)</div>
+          </div>
+          <button class="btn btn-sm btn-ghost" style="font-size:11px" onclick="showToast('Extending deadline by 30 days...')">＋30d</button>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:10px">
+          <span style="font-size:12px; color:var(--text-secondary)">Manual Override Control:</span>
+          <button class="btn btn-sm btn-secondary" style="font-size:12px; padding:4px 12px" id="admin-toggle-btn-1" onclick="toggleDoctorStatus(1)">
+            ⏸️ Pause Access
+          </button>
+        </div>
+      </div>
+
+      <!-- Doctor Card 2: Dr Sneha Patel -->
+      <div class="card mb-md" style="border-left:4px solid var(--color-warning)">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px">
+          <div style="display:flex; gap:10px; align-items:center">
+            <div class="avatar avatar-md avatar-purple">SP</div>
+            <div>
+              <div style="font-size:15px; font-weight:700">Dr. Sneha Patel</div>
+              <div style="font-size:12px; color:var(--text-tertiary)">PCOS Specialist · 12 clients</div>
+            </div>
+          </div>
+          <span class="badge badge-yellow">⚠️ Expiring Soon</span>
+        </div>
+        <div style="background:var(--bg-tertiary); padding:10px; border-radius:var(--radius-md); font-size:12px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+          <div>
+            <div style="font-weight:600; color:var(--text-primary)">Pro Clinical Access Tier</div>
+            <div style="color:var(--color-warning); font-weight:600">Deadline: Jul 10, 2026 (3 days left)</div>
+          </div>
+          <button class="btn btn-sm btn-primary" style="font-size:11px" onclick="showToast('Renewal reminder sent to Dr. Sneha')">📨 Remind</button>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:10px">
+          <span style="font-size:12px; color:var(--text-secondary)">Manual Override Control:</span>
+          <button class="btn btn-sm btn-secondary" style="font-size:12px; padding:4px 12px" onclick="showToast('Dr. Sneha access paused')">
+            ⏸️ Pause Access
+          </button>
+        </div>
+      </div>
+
+      <!-- Doctor Card 3: Dr Vikram Verma (Paused/Expired) -->
+      <div class="card mb-md" style="border-left:4px solid var(--color-danger); opacity:0.8">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px">
+          <div style="display:flex; gap:10px; align-items:center">
+            <div class="avatar avatar-md avatar-blue">VV</div>
+            <div>
+              <div style="font-size:15px; font-weight:700">Dr. Vikram Verma</div>
+              <div style="font-size:12px; color:var(--text-tertiary)">Weight Loss Clinic · 8 clients</div>
+            </div>
+          </div>
+          <span class="badge badge-red">⏰ Deadline Expired</span>
+        </div>
+        <div style="background:var(--bg-tertiary); padding:10px; border-radius:var(--radius-md); font-size:12px; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+          <div>
+            <div style="font-weight:600; color:var(--text-primary)">Pro Clinical Access Tier</div>
+            <div style="color:var(--color-danger)">Expired: Jun 30, 2026 (Auto-Paused)</div>
+          </div>
+          <button class="btn btn-sm btn-secondary" style="font-size:11px" onclick="showToast('Extended deadline by 7 days!')">＋7d</button>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-color); padding-top:10px">
+          <span style="font-size:12px; color:var(--text-secondary)">Manual Override Control:</span>
+          <button class="btn btn-sm btn-primary" style="font-size:12px; padding:4px 12px" onclick="showToast('✅ Dr. Vikram reactivated!')">
+            ▶️ Reactivate Access
+          </button>
+        </div>
+      </div>
+
+      <div style="height:20px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- N1: NUTRITIONIST DASHBOARD                                 -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<section class="screen" id="screen-n-dashboard">
+  <div class="top-bar">
+    <div class="avatar avatar-sm" onclick="goTo('screen-role')" style="cursor:pointer" title="Back to role select">PM</div>
+    <div class="top-bar-center">
+      <div class="top-bar-title">Good evening 👋</div>
+      <div class="top-bar-subtitle">Dr. Priya Mehta</div>
+    </div>
+    <button class="icon-btn notif-badge" onclick="goTo('screen-n-alerts')" title="Alerts">
+      🔔
+  </div>
+
+  <!-- Paused Subscription Banner -->
+  <div id="n-dashboard-paused-banner" style="display:none; background:rgba(239,68,68,0.15); border-bottom:1px solid var(--color-danger); padding:12px 16px; color:var(--text-primary); font-size:12px; flex-shrink:0;">
+    <div style="display:flex; align-items:center; justify-content:space-between; font-weight:700; color:var(--color-danger); margin-bottom:4px;">
+      <span>🚨 Platform Subscription Paused</span>
+      <span class="badge badge-red" style="font-size:10px">Read-Only Access</span>
+    </div>
+    <div style="color:var(--text-secondary); line-height:1.4">
+      Your NutriCoach SaaS subscription is currently inactive. AI automated check-ins and adding new clients are suspended.
+      <span style="text-decoration:underline; cursor:pointer; color:var(--color-danger); font-weight:700; margin-left:4px" onclick="goTo('screen-n-settings')">View Expiry in Settings →</span>
+    </div>
+  </div>
+
+  <div class="scroll-content">
+    <!-- Stats Row -->
+    <div class="stats-row mt-md">
+      <div class="stat-card">
+        <div class="stat-num">3</div>
+        <div class="stat-label">Active</div>
+      </div>
+      <div class="stat-card" style="border-color: rgba(255,95,95,0.2)">
+        <div class="stat-num" style="color:var(--color-danger)">🚨 1</div>
+        <div class="stat-label">Attention</div>
+      </div>
+      <div class="stat-card" style="border-color: rgba(245,166,35,0.2)">
+        <div class="stat-num" style="color:var(--color-warning)">⚠️ 1</div>
+        <div class="stat-label">Expiring</div>
+      </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="filter-tabs">
+      <button class="filter-tab active" onclick="filterClients('all', this)">All Clients</button>
+      <button class="filter-tab" onclick="filterClients('attention', this)">🚨 Needs Attention</button>
+      <button class="filter-tab" onclick="filterClients('no_response', this)">No Response</button>
+      <button class="filter-tab" onclick="filterClients('expiring', this)">⚠️ Expiring</button>
+      <button class="filter-tab" onclick="filterClients('past', this)">Past Clients</button>
+    </div>
+
+    <!-- Client Cards -->
+    <div class="section-pad" id="client-list">
+      <!-- Ananya Sharma -->
+      <div class="client-card" data-status="active" data-attention="false" data-responded="true" onclick="openClient(1)">
+        <div class="client-card-top">
+          <div class="avatar avatar-md">AS</div>
+          <div class="client-card-info">
+            <div class="client-name">Ananya Sharma</div>
+            <div class="client-sub">⏱ Checked in 2 hrs ago</div>
+          </div>
+          <span class="badge badge-green">✅ On Track</span>
+        </div>
+        <div class="client-card-bottom">
+          <div class="client-meta">🔋 High Energy · Weight Management</div>
+          <div style="font-size:12px; color:var(--text-tertiary)">28 days left</div>
+        </div>
+      </div>
+
+      <!-- Meera Patel — FLAGGED -->
+      <div class="client-card flagged" data-status="expiring" data-attention="true" data-responded="false" onclick="openClient(2)">
+        <div class="client-card-top">
+          <div class="avatar avatar-md avatar-orange">MP</div>
+          <div class="client-card-info">
+            <div class="client-name">
+              🚨 Meera Patel
+            </div>
+            <div class="client-sub" style="color:var(--color-danger)">No response today</div>
+          </div>
+          <span class="badge badge-red">❌ Off Track</span>
+        </div>
+        <div class="client-card-bottom">
+          <div class="client-meta">🪫 Low Energy · Diabetic Mgmt</div>
+          <div style="font-size:12px; color:var(--color-warning); font-weight:600">⚠️ 3 days left</div>
+        </div>
+      </div>
+
+      <!-- Riya Shah -->
+      <div class="client-card" data-status="active" data-attention="false" data-responded="true" onclick="openClient(3)">
+        <div class="client-card-top">
+          <div class="avatar avatar-md avatar-purple">RS</div>
+          <div class="client-card-info">
+            <div class="client-name">Riya Shah</div>
+            <div class="client-sub">⏱ Checked in 5 hrs ago</div>
+          </div>
+          <span class="badge badge-yellow">⚠️ Partial</span>
+        </div>
+        <div class="client-card-bottom">
+          <div class="client-meta">⚡ Medium Energy · Post-Pregnancy</div>
+          <div style="font-size:12px; color:var(--text-tertiary)">45 days left</div>
+        </div>
+      </div>
+
+      <!-- Kavita Joshi — PAST CLIENT -->
+      <div class="client-card" data-status="expired" data-attention="false" data-responded="false" style="opacity:0.7" onclick="openClient(4)">
+        <div class="client-card-top">
+          <div class="avatar avatar-md avatar-blue">KJ</div>
+          <div class="client-card-info">
+            <div class="client-name">Kavita Joshi</div>
+            <div class="client-sub">Program completed Jul 1</div>
+          </div>
+          <span class="badge badge-gray">🔴 Expired</span>
+        </div>
+        <div class="client-card-bottom">
+          <div class="client-meta">PCOS Management · 90-day program</div>
+          <button class="btn btn-sm btn-ghost" onclick="event.stopPropagation(); openClient(4)">View History</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Client Button -->
+    <div class="section-pad" style="padding-bottom: 20px">
+      <button class="btn btn-primary btn-full" onclick="goTo('screen-n-add-client')">
+        ＋ Add New Client
+      </button>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <button class="nav-item active" onclick="goTo('screen-n-dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-clients')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>Clients</span>
+    </button>
+    <button class="nav-item" style="position:relative" onclick="goTo('screen-n-alerts')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="notif-badge" style="position:relative; font-size:10px">Alerts</span>
+      <span style="position:absolute; top:4px; right:8px; background:var(--color-danger); color:white; font-size:8px; font-weight:700; width:14px; height:14px; border-radius:50%; display:flex; align-items:center; justify-content:center">2</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-subscriptions')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Timeline</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </button>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- N2-N6: CLIENT PROFILE                                      -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<section class="screen" id="screen-n-profile">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-n-dashboard')">←</button>
+    <div class="top-bar-center">
+      <div class="top-bar-title" id="profile-name-header">Client Profile</div>
+    </div>
+    <button class="icon-btn">⋯</button>
+  </div>
+
+  <!-- Profile Hero -->
+  <div class="profile-hero" id="profile-hero">
+    <div class="avatar avatar-xl" id="profile-avatar">AS</div>
+    <div>
+      <div style="font-size:20px; font-weight:700;" id="profile-name">Ananya Sharma</div>
+      <div style="font-size:13px; color:var(--text-secondary); margin-top:2px" id="profile-plan-type">Weight Management Plan</div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center">
+      <span class="badge" id="profile-status-badge">✅ Active</span>
+      <span style="font-size:12px; color:var(--text-tertiary)" id="profile-days-left">28 days remaining</span>
+    </div>
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-item active" onclick="switchProfileTab('overview', this)">Overview</button>
+    <button class="tab-item" onclick="switchProfileTab('today', this)">Today</button>
+    <button class="tab-item" onclick="switchProfileTab('history', this)">History</button>
+    <button class="tab-item" onclick="switchProfileTab('analytics', this)">Analytics</button>
+    <button class="tab-item" onclick="switchProfileTab('plan', this)">Plan</button>
+  </div>
+
+  <div class="scroll-content" style="padding-bottom: calc(var(--nav-height) + 60px)">
+
+    <!-- ── TAB: OVERVIEW ── -->
+    <div class="tab-content active" id="tab-overview">
+      <!-- Stats -->
+      <div class="stats-row mt-md">
+        <div class="stat-card">
+          <div class="stat-num" style="color:var(--color-warning)">🔥</div>
+          <div class="stat-num" id="profile-streak" style="margin-top:2px">14</div>
+          <div class="stat-label">Day Streak</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="profile-consistency">87%</div>
+          <div class="stat-label">Consistency</div>
+        </div>
+        <div class="stat-card" id="profile-adherence-card">
+          <div class="stat-num" style="font-size:18px">✅</div>
+          <div class="stat-label">On Track</div>
+        </div>
+      </div>
+
+      <!-- Subscription -->
+      <div class="section-pad">
+        <div class="section-header">
+          <span class="section-title">Subscription</span>
+          <button class="btn btn-sm btn-ghost" onclick="goTo('screen-n-subscriptions')">View All</button>
+        </div>
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+            <span style="font-size:13px; color:var(--text-secondary)" id="profile-sub-dates">Jun 4 → Aug 3, 2026</span>
+            <span class="badge" id="profile-sub-badge">✅ Active</span>
+          </div>
+          <div class="progress-bar-wrap sub-progress-wrap">
+            <div class="progress-bar-fill" id="profile-sub-progress" style="width:55%"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:6px">
+            <span style="font-size:12px; color:var(--text-tertiary)" id="profile-sub-used">33 days used</span>
+            <span style="font-size:12px; color:var(--text-tertiary)" id="profile-sub-left">28 days left</span>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:14px">
+            <button class="btn btn-sm btn-secondary flex-1">+ Extend</button>
+            <button class="btn btn-sm btn-primary flex-1">🔄 Renew</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Caretaker -->
+      <div class="section-pad mt-sm">
+        <div class="section-title mb-sm">Caretaker</div>
+        <div class="card" style="display:flex; align-items:center; gap:12px">
+          <div class="avatar avatar-sm" style="background: linear-gradient(135deg, #5B9CF6, #2563EB)">SH</div>
+          <div>
+            <div style="font-size:14px; font-weight:600" id="profile-caretaker">Sunita Sharma (Mother)</div>
+            <div style="font-size:12px; color:var(--text-tertiary)">Food preparation & daily observation</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Instructions -->
+      <div class="section-pad mt-md">
+        <div class="section-header">
+          <span class="section-title">AI Instructions</span>
+          <button class="btn btn-sm btn-ghost" onclick="openAIPromptModal('client')">＋ Add Rule</button>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px" id="profile-ai-instructions">
+          <!-- rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="section-pad mt-md">
+        <div class="section-title mb-sm">Quick Actions</div>
+        <div class="quick-actions">
+          <button class="quick-action-btn" onclick="openNutritionistChat(currentClientId)">
+            <span class="qa-icon">💬</span>Message
+          </button>
+          <button class="quick-action-btn" onclick="openAIPromptModal('client')">
+            <span class="qa-icon">🤖</span>AI Prompt
+          </button>
+          <button class="quick-action-btn" onclick="switchProfileTab('plan', document.querySelector('.tab-item:nth-child(5)'))">
+            <span class="qa-icon">📋</span>Edit Plan
+          </button>
+          <button class="quick-action-btn" onclick="switchProfileTab('analytics', document.querySelector('.tab-item:nth-child(4)'))">
+            <span class="qa-icon">📊</span>Analytics
+          </button>
+        </div>
+      </div>
+
+      <div style="height:20px"></div>
+    </div>
+
+    <!-- ── TAB: TODAY ── -->
+    <div class="tab-content" id="tab-today">
+      <!-- Date header -->
+      <div style="flex-shrink:0; padding: 8px 16px; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); display:flex; align-items:center; justify-content:space-between">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-tertiary)">Monday, Jul 7 · Daily Check-in</div>
+        <div style="display:flex; align-items:center; gap:8px">
+          <span class="badge badge-green" style="font-size:10px">✅ Replied</span>
+          <button class="btn btn-sm btn-primary" style="font-size:11px; padding:3px 8px" onclick="openNutritionistChat(currentClientId)">💬 Full Screen Chat ↗</button>
+        </div>
+      </div>
+
+
+      <!-- Scrollable chat area -->
+      <div class="tab-chat-messages" id="profile-chat"></div>
+
+      <!-- AI extracted summary -->
+      <div class="today-summary-bar" id="profile-data-card">
+        <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-tertiary); margin-bottom:7px">AI Summary</div>
+        <div class="data-badges">
+          <span class="badge badge-yellow">⚠️ Partial</span>
+          <span class="badge badge-gray">😴 Tired Mood</span>
+          <span class="badge badge-blue">📝 Caretaker Note</span>
+        </div>
+      </div>
+
+      <!-- Nutritionist note input -->
+      <div class="today-note-bar">
+        <input class="today-note-input" placeholder="Add your note as nutritionist..." />
+        <button class="chat-send-btn" onclick="showToast('Note added!')">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── TAB: HISTORY ── -->
+    <div class="tab-content" id="tab-history">
+      <div style="padding: 12px 16px;">
+        <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap">
+          <button class="filter-tab active" style="padding:5px 12px; font-size:12px">This Week</button>
+          <button class="filter-tab" style="padding:5px 12px; font-size:12px">This Month</button>
+          <button class="filter-tab" style="padding:5px 12px; font-size:12px">All Time</button>
+        </div>
+        <div id="profile-history-list">
+          <!-- rendered by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: ANALYTICS ── -->
+    <div class="tab-content" id="tab-analytics">
+      <div style="padding: 16px">
+        <!-- Adherence Chart -->
+        <div class="section-header mb-sm">
+          <span class="section-title">Adherence Trend</span>
+          <span class="badge badge-green">↑ Improving</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="adherenceChart"></canvas>
+        </div>
+
+        <!-- Energy Chart -->
+        <div class="section-header mb-sm">
+          <span class="section-title">Energy Levels</span>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="energyChart"></canvas>
+        </div>
+
+        <!-- Stats summary -->
+        <div class="section-header mb-sm mt-md">
+          <span class="section-title">This Period</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px">
+          <div class="stat-card" style="text-align:left; padding:14px">
+            <div class="stat-num" style="font-size:28px">🔥</div>
+            <div style="font-size:18px; font-weight:800; margin-top:4px">14 days</div>
+            <div style="font-size:11px; color:var(--text-tertiary)">Current streak</div>
+          </div>
+          <div class="stat-card" style="text-align:left; padding:14px">
+            <div class="stat-num" style="font-size:28px">✅</div>
+            <div style="font-size:18px; font-weight:800; margin-top:4px">87%</div>
+            <div style="font-size:11px; color:var(--text-tertiary)">Consistency rate</div>
+          </div>
+          <div class="stat-card" style="text-align:left; padding:14px">
+            <div style="font-size:18px; font-weight:800; color:var(--color-success)">Best Day</div>
+            <div style="font-size:13px; color:var(--text-secondary); margin-top:4px">Friday, Jul 4</div>
+          </div>
+          <div class="stat-card" style="text-align:left; padding:14px">
+            <div style="font-size:18px; font-weight:800; color:var(--color-danger)">Tough Day</div>
+            <div style="font-size:13px; color:var(--text-secondary); margin-top:4px">Wednesday, Jul 2</div>
+          </div>
+        </div>
+
+        <!-- Symptom log -->
+        <div class="section-title mb-sm">Symptom Log</div>
+        <div class="card">
+          <div style="font-size:13px; color:var(--text-secondary); text-align:center; padding:8px">No symptoms reported this period ✅</div>
+        </div>
+
+        <div style="height:20px"></div>
+        <div style="padding:12px; background:var(--bg-tertiary); border-radius:var(--radius-md); border:1px solid var(--border-color); text-align:center; color:var(--text-tertiary); font-size:12px">
+          📝 More analytics metrics to be added here in future phases
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TAB: PLAN ── -->
+    <div class="tab-content" id="tab-plan">
+      <div style="padding:16px">
+        <div class="section-header mb-sm">
+          <span class="section-title">Nutrition Plan</span>
+          <button class="btn btn-sm btn-ghost">✏️ Edit</button>
+        </div>
+        <div class="card mb-md">
+          <div style="font-size:14px; line-height:1.7; color:var(--text-primary)" id="profile-plan-text">
+            1400 kcal/day · No sugar · 3L water · High protein breakfast · Evening walk 30 mins
+          </div>
+        </div>
+
+        <div class="section-header mb-sm">
+          <span class="section-title">AI Instructions</span>
+          <button class="btn btn-sm btn-primary" style="font-size:11px" onclick="openAIPromptModal('client')">＋ Add Rule</button>
+        </div>
+        <div style="font-size:12px; color:var(--text-tertiary); margin-bottom:12px">These instructions tell the AI how to behave specifically for this client.</div>
+
+        <div style="display:flex; flex-direction:column; gap:10px" id="plan-tab-instructions">
+          <!-- rendered by JS -->
+        </div>
+
+        <div style="height:20px"></div>
+      </div>
+    </div>
+
+  </div><!-- end scroll-content -->
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <button class="nav-item" onclick="goTo('screen-n-dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <span>Client</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-alerts')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span>Alerts</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-subscriptions')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Timeline</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </button>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- N7: ADD NEW CLIENT                                         -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<section class="screen" id="screen-n-add-client">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-n-dashboard')">←</button>
+    <div class="top-bar-center">
+      <div class="top-bar-title">Add New Client</div>
+    </div>
+    <div style="width:36px"></div>
+  </div>
+
+  <div class="scroll-content">
+    <div class="step-indicator" style="padding:16px">
+      <div class="step-dot done" id="sdot-1"></div>
+      <div class="step-dot" id="sdot-2"></div>
+      <div class="step-dot" id="sdot-3"></div>
+      <div class="step-dot" id="sdot-4"></div>
+    </div>
+
+    <!-- Step 1: Basic Info -->
+    <div class="step-content active" id="step-1">
+      <div style="margin-bottom:20px">
+        <div style="font-size:20px; font-weight:800">Basic Information</div>
+        <div style="font-size:13px; color:var(--text-secondary); margin-top:4px">Step 1 of 4 — Who is this client?</div>
+      </div>
+      <div class="input-group">
+        <label class="input-label">Client's Full Name *</label>
+        <input class="input" placeholder="e.g. Priya Sharma" />
+      </div>
+      <div class="input-group">
+        <label class="input-label">Phone / Contact</label>
+        <input class="input" placeholder="+91 98765 43210" />
+      </div>
+      <div class="input-group">
+        <label class="input-label">Caretaker's Name (optional)</label>
+        <input class="input" placeholder="e.g. Ramesh Sharma (Father)" />
+      </div>
+      <div class="input-group">
+        <label class="input-label">Program Duration</label>
+        <select class="input" style="cursor:pointer">
+          <option>30 days</option>
+          <option>45 days</option>
+          <option selected>60 days</option>
+          <option>90 days</option>
+          <option>Custom</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="nextStep(2)">Continue →</button>
+    </div>
+
+    <!-- Step 2: Nutrition Plan -->
+    <div class="step-content" id="step-2">
+      <div style="margin-bottom:20px">
+        <div style="font-size:20px; font-weight:800">Nutrition Plan</div>
+        <div style="font-size:13px; color:var(--text-secondary); margin-top:4px">Step 2 of 4 — What's the plan?</div>
+      </div>
+      <div class="input-group">
+        <label class="input-label">Plan Type</label>
+        <select class="input" style="cursor:pointer">
+          <option>Weight Management</option>
+          <option>Diabetic Management</option>
+          <option>PCOS Management</option>
+          <option>Post-Pregnancy Recovery</option>
+          <option>General Wellness</option>
+          <option>Custom</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label class="input-label">Plan Summary *</label>
+        <textarea class="input" rows="5" placeholder="e.g. 1400 kcal/day · No sugar · 3L water · High protein breakfast · Evening walk 30 mins..."></textarea>
+      </div>
+      <div class="input-group">
+        <label class="input-label" style="display:flex; justify-content:space-between"><span>🤖 Backend AI Guidance Prompt (optional)</span><span style="color:var(--accent-green); cursor:pointer; font-weight:normal" onclick="openAIPromptModal('global')">Configure Master LLM ↗</span></label>
+        <textarea class="input" rows="3" placeholder="e.g. She prefers Hinglish. Be very gentle, she gets anxious easily..."></textarea>
+      </div>
+      <div style="display:flex; gap:10px">
+        <button class="btn btn-secondary flex-1" onclick="nextStep(1)">← Back</button>
+        <button class="btn btn-primary flex-1" onclick="nextStep(3)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Schedule -->
+    <div class="step-content" id="step-3">
+      <div style="margin-bottom:20px">
+        <div style="font-size:20px; font-weight:800">Check-in Schedule</div>
+        <div style="font-size:13px; color:var(--text-secondary); margin-top:4px">Step 3 of 4 — When to check in?</div>
+      </div>
+      <div class="card mb-md">
+        <div style="font-size:13px; color:var(--text-tertiary); margin-bottom:8px">ℹ️ Default schedule will be used unless you set a custom time for this client.</div>
+        <div style="font-size:14px; font-weight:600; color:var(--accent-green)">📅 Daily: 7:00 PM IST</div>
+        <div style="font-size:14px; font-weight:600; color:var(--accent-green); margin-top:4px">📅 Weekly: Every Sunday, 6:00 PM IST</div>
+      </div>
+      <div class="input-group">
+        <label class="input-label">Custom Daily Check-in Time (optional)</label>
+        <input class="input" type="time" value="19:00" />
+      </div>
+      <div class="input-group">
+        <label class="input-label">Start Date</label>
+        <input class="input" type="date" value="2026-07-08" />
+      </div>
+      <div style="display:flex; gap:10px">
+        <button class="btn btn-secondary flex-1" onclick="nextStep(2)">← Back</button>
+        <button class="btn btn-primary flex-1" onclick="nextStep(4)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Review & Invite -->
+    <div class="step-content" id="step-4">
+      <div style="margin-bottom:20px">
+        <div style="font-size:20px; font-weight:800">Review & Send Invite</div>
+        <div style="font-size:13px; color:var(--text-secondary); margin-top:4px">Step 4 of 4 — Looks good?</div>
+      </div>
+      <div class="card mb-md">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px">
+          <div class="avatar avatar-lg">NS</div>
+          <div>
+            <div style="font-size:16px; font-weight:700">New Client</div>
+            <div style="font-size:13px; color:var(--text-secondary)">Weight Management · 60 days</div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px; font-size:13px">
+          <div style="display:flex; justify-content:space-between">
+            <span style="color:var(--text-tertiary)">Start Date</span>
+            <span>Jul 8, 2026</span>
+          </div>
+          <div style="display:flex; justify-content:space-between">
+            <span style="color:var(--text-tertiary)">End Date</span>
+            <span>Sep 5, 2026</span>
+          </div>
+          <div style="display:flex; justify-content:space-between">
+            <span style="color:var(--text-tertiary)">Daily Check-in</span>
+            <span>7:00 PM IST</span>
+          </div>
+          <div style="display:flex; justify-content:space-between">
+            <span style="color:var(--text-tertiary)">AI Language</span>
+            <span>Auto-detect</span>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" style="font-size:16px" onclick="showToast('✅ Client added! Invite sent via WhatsApp.')">
+        🚀 Add Client & Send Invite
+      </button>
+      <button class="btn btn-secondary btn-full mt-sm" onclick="nextStep(3)">← Back</button>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- N8: ALERTS & FLAGS                                         -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<section class="screen" id="screen-n-alerts">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-n-dashboard')">←</button>
+    <div class="top-bar-center">
+      <div class="top-bar-title">Alerts & Flags</div>
+      <div class="top-bar-subtitle">3 unreviewed</div>
+    </div>
+    <button class="icon-btn" onclick="showToast('All marked as reviewed')">✓ All</button>
+  </div>
+
+  <div class="scroll-content">
+    <div style="padding:16px">
+      <!-- Alert 0: AI Escalation (Pending Query) -->
+      <div class="alert-item urgent" id="alert-pending-query" style="border-color:var(--color-warning); background:rgba(245,166,35,0.08)">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px">
+          <div>
+            <div style="font-size:13px; font-weight:700; color:var(--color-warning)">❓ Ananya Sharma — AI Escalation (Pending Query)</div>
+            <div style="font-size:12px; color:var(--text-tertiary); margin-top:2px">Today, 7:35 PM</div>
+          </div>
+          <span class="badge badge-yellow">Needs Doctor Reply</span>
+        </div>
+        <div style="font-size:13px; color:var(--text-primary); margin-bottom:8px; font-weight:600">
+          "Can I take 1 scoop whey protein after dinner instead of evening walk? Knees hurting today."
+        </div>
+        <div style="font-size:11px; color:var(--text-secondary); margin-bottom:12px;">
+          🤖 <strong>AI Reason:</strong> Outside standard plan rules (calorie/macro substitution & pain reported). Clinical approval required.
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <button class="btn btn-sm btn-primary" onclick="openNutritionistChat(1)">💬 Reply & Resolve</button>
+          <button class="btn btn-sm btn-secondary" onclick="openClient(1)">View Profile</button>
+        </div>
+      </div>
+
+      <!-- Alert 1 -->
+      <div class="alert-item">
+
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px">
+          <div>
+            <div style="font-size:13px; font-weight:700; color:var(--color-danger)">🚨 Meera Patel — No Response (2 Days)</div>
+            <div style="font-size:12px; color:var(--text-tertiary); margin-top:2px">Today, 7:00 PM</div>
+          </div>
+          <span class="badge badge-red">Urgent</span>
+        </div>
+        <div style="font-size:13px; color:var(--text-secondary); margin-bottom:12px">
+          No response to check-ins on Jul 6 or Jul 7. Last flagged on Jul 5 for reported dizziness. Please follow up immediately.
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap">
+          <button class="btn btn-sm btn-danger" onclick="showToast('Opening message to Meera...')">💬 Send Message</button>
+          <button class="btn btn-sm btn-secondary" onclick="openClient(2)">View Profile</button>
+          <button class="btn btn-sm btn-ghost" onclick="showToast('Marked as reviewed')">✓ Reviewed</button>
+        </div>
+      </div>
+
+      <!-- Alert 2 -->
+      <div class="alert-item warning">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px">
+          <div>
+            <div style="font-size:13px; font-weight:700; color:var(--color-warning)">⚠️ Meera Patel — Subscription Expiring</div>
+            <div style="font-size:12px; color:var(--text-tertiary); margin-top:2px">Today</div>
+          </div>
+          <span class="badge badge-yellow">3 days left</span>
+        </div>
+        <div style="font-size:13px; color:var(--text-secondary); margin-bottom:12px">
+          40-day Diabetic Management program ends July 10, 2026. Follow up for renewal.
+        </div>
+        <div style="display:flex; gap:8px">
+          <button class="btn btn-sm btn-primary" onclick="showToast('Renewal flow opened...')">🔄 Renew Plan</button>
+          <button class="btn btn-sm btn-ghost" onclick="showToast('Marked as reviewed')">✓ Reviewed</button>
+        </div>
+      </div>
+
+      <!-- Alert 3 -->
+      <div class="alert-item warning">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px">
+          <div>
+            <div style="font-size:13px; font-weight:700; color:var(--color-warning)">⚠️ Riya Shah — Consistency Drop</div>
+            <div style="font-size:12px; color:var(--text-tertiary); margin-top:2px">Yesterday</div>
+          </div>
+          <span class="badge badge-yellow">Attention</span>
+        </div>
+        <div style="font-size:13px; color:var(--text-secondary); margin-bottom:12px">
+          Meal adherence dropped to 60% this week vs 80% last week. Baby routine disruption reported.
+        </div>
+        <div style="display:flex; gap:8px">
+          <button class="btn btn-sm btn-secondary" onclick="showToast('Sending encouragement note...')">💚 Send Encouragement</button>
+          <button class="btn btn-sm btn-ghost" onclick="showToast('Marked as reviewed')">✓ Reviewed</button>
+        </div>
+      </div>
+
+      <div style="text-align:center; padding:20px; color:var(--text-tertiary); font-size:13px">
+        ✅ No more alerts for now
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-item" onclick="goTo('screen-n-dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-clients')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <span>Clients</span>
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span>Alerts</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-subscriptions')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Timeline</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </button>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- N9: SUBSCRIPTION TIMELINE                                  -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<section class="screen" id="screen-n-subscriptions">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-n-dashboard')">←</button>
+    <div class="top-bar-center">
+      <div class="top-bar-title">Subscription Timeline</div>
+    </div>
+    <div style="width:36px"></div>
+  </div>
+
+  <div class="scroll-content">
+    <div style="padding:16px">
+      <div class="filter-tabs" style="padding:0 0 12px">
+        <button class="filter-tab active">All</button>
+        <button class="filter-tab">Active</button>
+        <button class="filter-tab">Expiring</button>
+        <button class="filter-tab">Expired</button>
+      </div>
+
+      <!-- Ananya - Active -->
+      <div class="sub-item" onclick="openClient(1)" style="cursor:pointer">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px">
+          <div class="avatar avatar-sm">AS</div>
+          <div class="flex-1">
+            <div style="font-size:14px; font-weight:600">Ananya Sharma</div>
+            <div style="font-size:11px; color:var(--text-tertiary)">Weight Management · 60 days</div>
+          </div>
+          <span class="badge badge-green">✅ Active</span>
+        </div>
+        <div class="progress-bar-wrap mb-sm">
+          <div class="progress-bar-fill" style="width:55%"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-tertiary); margin-bottom:10px">
+          <span>Jun 4</span>
+          <span>33/60 days · <strong style="color:var(--text-primary)">28 days left</strong></span>
+          <span>Aug 3</span>
+        </div>
+        <div style="display:flex; gap:8px">
+          <button class="btn btn-sm btn-secondary flex-1" onclick="event.stopPropagation(); showToast('Extending Ananya plan by 30 days...')">+ Extend</button>
+          <button class="btn btn-sm btn-primary flex-1" onclick="event.stopPropagation(); showToast('Renewal flow for Ananya...')">🔄 Renew</button>
+        </div>
+      </div>
+
+      <!-- Meera - Expiring -->
+      <div class="sub-item" style="border-color: rgba(245,166,35,0.3); cursor:pointer" onclick="openClient(2)">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px">
+          <div class="avatar avatar-sm avatar-orange">MP</div>
+          <div class="flex-1">
+            <div style="font-size:14px; font-weight:600">Meera Patel</div>
+            <div style="font-size:11px; color:var(--text-tertiary)">Diabetic Management · 40 days</div>
+          </div>
+          <span class="badge badge-yellow">⚠️ Expiring</span>
+        </div>
+        <div class="progress-bar-wrap mb-sm">
+          <div class="progress-bar-fill warning" style="width:92%"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-tertiary); margin-bottom:10px">
+          <span>Jun 1</span>
+          <span>37/40 days · <strong style="color:var(--color-warning)">3 days left!</strong></span>
+          <span>Jul 10</span>
+        </div>
+        <div style="display:flex; gap:8px">
+          <button class="btn btn-sm btn-secondary flex-1" onclick="event.stopPropagation(); showToast('Extending Meera plan...')">+ Extend</button>
+          <button class="btn btn-sm btn-primary flex-1" onclick="event.stopPropagation(); showToast('Renewal for Meera...')">🔄 Renew</button>
+        </div>
+      </div>
+
+      <!-- Riya - Active -->
+      <div class="sub-item" style="cursor:pointer" onclick="openClient(3)">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px">
+          <div class="avatar avatar-sm avatar-purple">RS</div>
+          <div class="flex-1">
+            <div style="font-size:14px; font-weight:600">Riya Shah</div>
+            <div style="font-size:11px; color:var(--text-tertiary)">Post-Pregnancy Recovery · 90 days</div>
+          </div>
+          <span class="badge badge-green">✅ Active</span>
+        </div>
+        <div class="progress-bar-wrap mb-sm">
+          <div class="progress-bar-fill" style="width:50%"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-tertiary); margin-bottom:10px">
+          <span>May 25</span>
+          <span>45/90 days · <strong style="color:var(--text-primary)">45 days left</strong></span>
+          <span>Aug 22</span>
+        </div>
+        <div style="display:flex; gap:8px">
+          <button class="btn btn-sm btn-secondary flex-1" onclick="event.stopPropagation(); showToast('Extending Riya plan...')">+ Extend</button>
+          <button class="btn btn-sm btn-ghost flex-1" onclick="event.stopPropagation(); showToast('Plan is active, no renewal needed yet')">🔄 Renew</button>
+        </div>
+      </div>
+
+      <!-- Kavita - Expired / Past -->
+      <div class="sub-item" style="opacity:0.7; border-color: rgba(255,95,95,0.2); cursor:pointer" onclick="openClient(4)">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px">
+          <div class="avatar avatar-sm avatar-blue">KJ</div>
+          <div class="flex-1">
+            <div style="font-size:14px; font-weight:600">Kavita Joshi</div>
+            <div style="font-size:11px; color:var(--text-tertiary)">PCOS Management · 90 days · Completed</div>
+          </div>
+          <span class="badge badge-red">🔴 Expired</span>
+        </div>
+        <div class="progress-bar-wrap mb-sm">
+          <div class="progress-bar-fill" style="width:100%; background: var(--bg-tertiary)"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-tertiary); margin-bottom:10px">
+          <span>Apr 1</span>
+          <span>Completed Jul 1, 2026 · 81% consistency</span>
+          <span>Jun 30</span>
+        </div>
+        <div style="display:flex; gap:8px">
+          <button class="btn btn-sm btn-ghost flex-1" onclick="event.stopPropagation(); openClient(4)">📁 View History</button>
+          <button class="btn btn-sm btn-primary flex-1" onclick="event.stopPropagation(); showToast('Reactivating Kavita... Set new dates')">🔄 Reactivate</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-item" onclick="goTo('screen-n-dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-clients')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <span>Clients</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-alerts')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span>Alerts</span>
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Timeline</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </button>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- N10: SETTINGS                                              -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<section class="screen" id="screen-n-settings">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-n-dashboard')">←</button>
+    <div class="top-bar-center"><div class="top-bar-title">Settings</div></div>
+    <div style="width:36px"></div>
+  </div>
+
+  <div class="scroll-content">
+    <div style="padding:16px">
+
+      <!-- My Platform Subscription -->
+      <div class="section-title mb-sm">SaaS Platform Subscription</div>
+      <div class="settings-section mb-md" id="n-settings-sub-box" style="border:1px solid rgba(76,175,130,0.3); background:linear-gradient(135deg, rgba(76,175,130,0.08), rgba(0,0,0,0)); overflow:hidden">
+        <div class="settings-row" style="border-bottom:1px solid var(--border-color); padding-bottom:12px">
+          <div>
+            <div class="settings-label" style="font-size:15px; font-weight:800; color:var(--text-primary)">💎 Pro SaaS Tier</div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px">Unlimited Clients · Full AI Coach Automation</div>
+          </div>
+          <span class="badge badge-green" id="n-settings-status-badge">✅ Active</span>
+        </div>
+        <div class="settings-row" style="border-bottom:1px solid var(--border-color); padding:12px 16px">
+          <div>
+            <div class="settings-label">Expiry Date</div>
+            <div style="font-size:12px; color:var(--text-tertiary)">Renewal interval: Annual</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:700; color:var(--text-primary)" id="n-settings-expiry-date">Aug 31, 2026</div>
+            <div style="font-size:11px; color:var(--accent-green)" id="n-settings-days-left">(55 days remaining)</div>
+          </div>
+        </div>
+        <div id="n-settings-paused-msg" style="display:none; padding:10px 16px; background:rgba(239,68,68,0.15); color:var(--color-danger); font-size:12px; font-weight:600; border-bottom:1px solid var(--border-color)">
+          ⚠️ Notice: Your platform subscription is currently PAUSED by admin. Automated check-ins are temporarily suspended.
+        </div>
+        <div style="padding:10px 16px; display:flex; justify-content:space-between; align-items:center">
+          <span style="font-size:12px; color:var(--text-tertiary)">Managed by Platform Admin</span>
+          <button class="btn btn-sm btn-secondary" style="font-size:11px" onclick="showToast('Contacting Platform Super-Admin for renewal...')">🔄 Contact Admin / Renew</button>
+        </div>
+      </div>
+
+      <!-- Profile -->
+      <div class="section-title mb-sm">Profile</div>
+      <div class="settings-section">
+        <div class="settings-row">
+          <div style="display:flex; align-items:center; gap:10px">
+            <div class="avatar avatar-sm">PM</div>
+            <div>
+              <div class="settings-label">Dr. Priya Mehta</div>
+              <div style="font-size:12px; color:var(--text-tertiary)">Clinical Nutritionist</div>
+            </div>
+          </div>
+          <span class="settings-value">✏️</span>
+        </div>
+      </div>
+
+      <!-- Check-in Schedule -->
+      <div class="section-title mb-sm mt-md">Check-in Schedule</div>
+      <div class="settings-section">
+        <div class="settings-row">
+          <div class="settings-label">Daily Check-in Time</div>
+          <span class="settings-value">7:00 PM</span>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Weekly Check-in Day</div>
+          <span class="settings-value">Sunday</span>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Weekly Check-in Time</div>
+          <span class="settings-value">6:00 PM</span>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Timezone</div>
+          <span class="settings-value">IST (Asia/Kolkata)</span>
+        </div>
+      </div>
+
+      <!-- AI Behavior -->
+      <div class="section-title mb-sm mt-md">AI Behavior</div>
+      <div class="settings-section">
+        <div class="settings-row" style="cursor:pointer" onclick="openAIPromptModal('global')">
+          <div>
+            <div class="settings-label" style="color:var(--accent-green); font-weight:700">🤖 Backend LLM Master Prompt</div>
+            <div style="font-size:12px; color:var(--text-tertiary)">View & edit system persona boundaries</div>
+          </div>
+          <span class="settings-value">Configure ↗</span>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Default Tone</div>
+          <span class="settings-value">Warm & Encouraging</span>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Default Language</div>
+          <span class="settings-value">Auto-detect</span>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Mention Your Name</div>
+          <div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+        </div>
+      </div>
+
+      <!-- Notifications -->
+      <div class="section-title mb-sm mt-md">Notifications</div>
+      <div class="settings-section">
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">Flag Alerts</div>
+            <div style="font-size:12px; color:var(--text-tertiary)">When AI flags a client</div>
+          </div>
+          <div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">No Response Alert</div>
+            <div style="font-size:12px; color:var(--text-tertiary)">Client hasn't replied in 2 days</div>
+          </div>
+          <div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">Daily Digest</div>
+            <div style="font-size:12px; color:var(--text-tertiary)">Morning summary of all clients</div>
+          </div>
+          <div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+        </div>
+        <div class="settings-row">
+          <div>
+            <div class="settings-label">Expiry Reminders</div>
+            <div style="font-size:12px; color:var(--text-tertiary)">7 days and 3 days before expiry</div>
+          </div>
+          <div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-knob"></div></div>
+        </div>
+      </div>
+
+      <!-- Data -->
+      <div class="section-title mb-sm mt-md">Data & Export</div>
+      <div class="settings-section">
+        <div class="settings-row" onclick="showToast('Exporting all client data as CSV...')">
+          <div class="settings-label">Export All Client Data</div>
+          <span class="settings-value">↓ CSV</span>
+        </div>
+        <div class="settings-row" onclick="showToast('Exporting reports as PDF...')">
+          <div class="settings-label">Export Weekly Reports</div>
+          <span class="settings-value">↓ PDF</span>
+        </div>
+      </div>
+
+      <!-- About -->
+      <div class="section-title mb-sm mt-md">About</div>
+      <div class="settings-section">
+        <div class="settings-row">
+          <div class="settings-label">App Version</div>
+          <span class="settings-value">Demo v1.0</span>
+        </div>
+        <div class="settings-row" onclick="goTo('screen-role')">
+          <div class="settings-label" style="color:var(--color-danger)">Switch View / Logout</div>
+          <span class="settings-value">→</span>
+        </div>
+      </div>
+
+      <div style="height:20px"></div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-item" onclick="goTo('screen-n-dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-clients')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <span>Clients</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-alerts')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span>Alerts</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-subscriptions')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Timeline</span>
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </button>
+  </div>
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- N9: NUTRITIONIST FULL-SCREEN CHAT (WhatsApp / Instagram Style) -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<section class="screen chat-screen-layout" id="screen-n-chat">
+
+  <!-- WhatsApp-style header for Doctor: back arrow + client avatar + name + status -->
+  <div style="display:flex; align-items:center; gap:10px; padding:0 8px 0 4px; height:var(--top-bar-height); background:var(--bg-secondary); border-bottom:1px solid var(--border-color); flex-shrink:0;">
+    <button class="icon-btn" onclick="goTo('screen-n-profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="avatar avatar-sm" id="n-chat-avatar" style="width:38px;height:38px;font-size:12px;flex-shrink:0">AS</div>
+    <div style="flex:1; min-width:0; cursor:pointer;" onclick="goTo('screen-n-profile')">
+      <div style="font-size:15px;font-weight:700;line-height:1.2;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="n-chat-name">Ananya Sharma</div>
+      <div style="font-size:11px;color:var(--accent-green);font-weight:500" id="n-chat-sub">● Active Plan · Online</div>
+    </div>
+    <button class="icon-btn" onclick="goTo('screen-n-profile')" title="Client Profile">👤</button>
+  </div>
+
+  <!-- AI Escalation Banner (Pending Query) -->
+  <div id="n-chat-pending-banner" style="display:none; background:rgba(245,166,35,0.12); border-bottom:1px solid var(--color-warning); padding:10px 14px; flex-shrink:0">
+    <div style="display:flex; align-items:center; justify-content:space-between; font-weight:700; font-size:12px; color:var(--color-warning); margin-bottom:4px">
+      <span>⚠️ AI Escalation — Needs Doctor Judgment</span>
+      <span class="badge badge-yellow" style="font-size:10px">Pending Reply</span>
+    </div>
+    <div style="font-size:13px; color:var(--text-primary); font-weight:600; margin-bottom:4px" id="n-chat-pending-q">
+      "Can I take 1 scoop whey protein after dinner instead of evening walk? Knees hurting today."
+    </div>
+    <div style="font-size:11px; color:var(--text-secondary); margin-bottom:8px" id="n-chat-pending-reason">
+      🤖 <strong>AI Note:</strong> Outside standard plan rules (calorie substitution & pain reported). Clinical approval required.
+    </div>
+    <div style="display:flex; gap:8px">
+      <button class="btn btn-sm btn-primary flex-1" style="font-size:12px; padding:6px" onclick="resolvePendingQuery('approved')">✅ Approve & Reply</button>
+      <button class="btn btn-sm btn-secondary flex-1" style="font-size:12px; padding:6px" onclick="resolvePendingQuery('ai_handle')">🤖 Let AI Handle</button>
+    </div>
+  </div>
+
+  <!-- Full-height scrollable chat area -->
+  <div class="chat-messages-area" id="nutritionist-chat-messages">
+    <!-- Rendered dynamically by JS -->
+  </div>
+
+  <!-- Input bar — at the very bottom, no nav below it -->
+  <div class="chat-input-bar">
+    <button class="icon-btn" style="color:var(--text-tertiary)" onclick="showToast('Attach diet chart / file feature coming soon')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+    </button>
+    <textarea class="chat-input-field" id="n-chat-input" rows="1" placeholder="Reply as Dr. Priya..." oninput="autoResize(this)" onkeydown="handleEnterDoc(event, this)"></textarea>
+    <button class="chat-send-btn" onclick="sendDoctorMessage()">
+      <svg viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+  <!-- ✅ NO BOTTOM NAV HERE — Full Screen WhatsApp / Instagram style for Doctor! -->
+
+</section>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+
+<!-- CLIENT VIEW SCREENS                                        -->
+<!-- ─────────────────────────────────────────────────────────── -->
+
+<!-- C1: CLIENT HOME -->
+<section class="screen" id="screen-c-home">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-role')">←</button>
+    <div class="top-bar-center">
+      <div class="top-bar-title">Hi, Ananya! 👋</div>
+      <div class="top-bar-subtitle">Monday, July 7</div>
+    </div>
+    <button class="icon-btn">🔔</button>
+  </div>
+
+  <div class="scroll-content">
+    <!-- Streak bar -->
+    <div style="padding:16px 16px 0">
+      <div class="streak-badge" style="display:inline-flex">🔥 14-day streak!</div>
+    </div>
+
+    <!-- Today's Check-in Card -->
+    <div class="checkin-card mt-md" style="margin: 12px 16px 0">
+      <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--accent-green); margin-bottom:10px">TODAY'S CHECK-IN</div>
+      <div style="font-size:14px; color:var(--text-primary); line-height:1.5; margin-bottom:14px">
+        "Hey Ananya! 🌿 Kya aaj ke teeno meals ho gaye? I know evenings can get hectic — how did it go today?"
+      </div>
+      <div style="display:flex; align-items:center; gap:8px">
+        <span class="badge badge-green">✅ Replied</span>
+        <button class="btn btn-sm btn-ghost" onclick="goTo('screen-c-checkin')">View conversation →</button>
+      </div>
+    </div>
+
+    <!-- Week Progress -->
+    <div style="padding:16px">
+      <div class="section-header mb-sm">
+        <span class="section-title">This Week</span>
+        <button class="btn btn-sm btn-ghost" onclick="goTo('screen-c-history')">See All</button>
+      </div>
+      <div class="card">
+        <div style="font-size:12px; color:var(--text-tertiary); margin-bottom:10px">Mon — Sun · Meal Adherence</div>
+        <div style="display:flex; gap:8px; justify-content:space-between">
+          <div style="text-align:center">
+            <div style="width:32px; height:60px; background:var(--accent-green); border-radius:8px; opacity:1"></div>
+            <div style="font-size:10px; color:var(--text-tertiary); margin-top:4px">Mon</div>
+          </div>
+          <div style="text-align:center">
+            <div style="width:32px; height:60px; background:var(--accent-green); border-radius:8px; opacity:1"></div>
+            <div style="font-size:10px; color:var(--text-tertiary); margin-top:4px">Tue</div>
+          </div>
+          <div style="text-align:center">
+            <div style="width:32px; height:60px; background:var(--color-warning); border-radius:8px; opacity:0.8"></div>
+            <div style="font-size:10px; color:var(--text-tertiary); margin-top:4px">Wed</div>
+          </div>
+          <div style="text-align:center">
+            <div style="width:32px; height:60px; background:var(--accent-green); border-radius:8px; opacity:1"></div>
+            <div style="font-size:10px; color:var(--text-tertiary); margin-top:4px">Thu</div>
+          </div>
+          <div style="text-align:center">
+            <div style="width:32px; height:60px; background:var(--accent-green); border-radius:8px; opacity:1"></div>
+            <div style="font-size:10px; color:var(--text-tertiary); margin-top:4px">Fri</div>
+          </div>
+          <div style="text-align:center">
+            <div style="width:32px; height:60px; background:var(--color-warning); border-radius:8px; opacity:0.6"></div>
+            <div style="font-size:10px; color:var(--text-tertiary); margin-top:4px">Sat</div>
+          </div>
+          <div style="text-align:center">
+            <div style="width:32px; height:60px; background:var(--accent-green); border-radius:8px; opacity:1"></div>
+            <div style="font-size:10px; color:var(--text-tertiary); margin-top:4px">Sun</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:12px; margin-top:12px; font-size:11px">
+          <span style="display:flex; align-items:center; gap:4px"><span style="width:10px; height:10px; border-radius:3px; background:var(--accent-green); display:inline-block"></span> On Track</span>
+          <span style="display:flex; align-items:center; gap:4px"><span style="width:10px; height:10px; border-radius:3px; background:var(--color-warning); display:inline-block"></span> Partial</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- My Plan Summary -->
+    <div style="padding:0 16px 16px">
+      <div class="section-header mb-sm">
+        <span class="section-title">My Plan</span>
+        <button class="btn btn-sm btn-ghost" onclick="goTo('screen-c-profile')">Details →</button>
+      </div>
+      <div class="card">
+        <div style="font-size:13px; color:var(--text-secondary); line-height:1.7">
+          1400 kcal/day · No sugar · 3L water daily<br>
+          High protein breakfast · Evening walk 30 mins
+        </div>
+        <div style="margin-top:12px">
+          <div style="font-size:12px; color:var(--text-tertiary); margin-bottom:6px">Program Progress · 28 days left</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" style="width:55%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- My Nutritionist -->
+    <div style="padding:0 16px 20px">
+      <div class="section-title mb-sm">My Nutritionist</div>
+      <div class="card" style="display:flex; align-items:center; gap:12px">
+        <div class="avatar avatar-md">PM</div>
+        <div>
+          <div style="font-size:14px; font-weight:600">Dr. Priya Mehta</div>
+          <div style="font-size:12px; color:var(--text-tertiary)">Clinical Nutritionist</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Client Bottom Nav -->
+  <div class="bottom-nav">
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-checkin')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Check-in</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-history')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span>History</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-progress')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Progress</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>Profile</span>
+    </button>
+  </div>
+</section>
+
+<!-- C2: CLIENT CHECK-IN — Full Screen, No Nav (WhatsApp / Instagram Style) -->
+<section class="screen chat-screen-layout" id="screen-c-checkin">
+
+  <!-- WhatsApp-style header: back arrow + avatar + name + status -->
+  <div style="display:flex; align-items:center; gap:10px; padding:0 8px 0 4px; height:var(--top-bar-height); background:var(--bg-secondary); border-bottom:1px solid var(--border-color); flex-shrink:0;">
+    <button class="icon-btn" onclick="goTo('screen-c-home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="20" height="20"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="avatar avatar-sm" style="width:38px;height:38px;font-size:12px;flex-shrink:0">AI</div>
+    <div style="flex:1">
+      <div style="font-size:15px;font-weight:700;line-height:1.2;color:var(--text-primary)">NutriCoach AI</div>
+      <div style="font-size:11px;color:var(--accent-green);font-weight:500">● Daily Check-in · Mon, Jul 7</div>
+    </div>
+    <button class="icon-btn" onclick="showToast('Info')">ℹ️</button>
+  </div>
+
+  <!-- Full-height scrollable chat — takes all remaining space -->
+  <div class="chat-messages-area" id="client-chat-messages">
+    <div class="date-sep">Today — Monday, July 7</div>
+
+    <!-- AI message -->
+    <div class="msg-row incoming">
+      <div class="msg-avatar">AI</div>
+      <div class="msg-bubble-wrap">
+        <div class="msg-sender-name msg-incoming-name">🤖 NutriCoach AI</div>
+        <div class="msg-bubble">Hey Ananya! 🌿 Kya aaj ke teeno meals ho gaye? I know evenings can get hectic — how did it go today?</div>
+        <div class="msg-time">7:00 PM ✓</div>
+      </div>
+    </div>
+
+    <!-- Client reply (right side, no label needed — it's "You") -->
+    <div class="msg-row outgoing">
+      <div class="msg-bubble-wrap">
+        <div class="msg-bubble">Haan, breakfast aur dinner accha raha! Lunch skip ho gaya tha meeting ki wajah se 😅</div>
+        <div class="msg-time">7:24 PM ✓✓</div>
+      </div>
+    </div>
+
+    <!-- Caretaker (right side, purple) -->
+    <div class="msg-row caretaker-msg outgoing">
+      <div class="msg-bubble-wrap">
+        <div class="msg-sender-name msg-caretaker-name" style="text-align:right">💜 Sunita (Mom)</div>
+        <div class="msg-bubble">She seemed a bit tired in the evening but finished her dinner well. Had some salad too!</div>
+        <div class="msg-time">7:31 PM ✓✓</div>
+      </div>
+      <div class="msg-avatar purple">SM</div>
+    </div>
+
+    <!-- AI reply -->
+    <div class="msg-row incoming">
+      <div class="msg-avatar">AI</div>
+      <div class="msg-bubble-wrap">
+        <div class="msg-sender-name msg-incoming-name">🤖 NutriCoach AI</div>
+        <div class="msg-bubble">2 out of 3 is still really good progress! 💪 Glad dinner went well. Tomorrow, try to keep something small ready for lunch — even a quick snack counts. Rest well tonight!</div>
+        <div class="msg-time">7:31 PM ✓</div>
+      </div>
+    </div>
+
+    <!-- Today's summary chip -->
+    <div style="align-self:center; margin-top:16px; padding:12px 20px; background:var(--bg-secondary); border-radius:var(--radius-lg); border:1px solid var(--border-color); text-align:center; max-width:240px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-tertiary);margin-bottom:8px">AI Summary</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
+        <span class="badge badge-yellow">⚠️ Partial</span>
+        <span class="badge badge-gray">😴 Tired</span>
+        <span class="badge badge-blue">📝 Caretaker</span>
+      </div>
+      <div style="font-size:11px;color:var(--color-success);margin-top:10px;font-weight:600">✅ Check-in complete!</div>
+    </div>
+  </div>
+
+  <!-- Input bar — at the very bottom, no nav below it -->
+  <div class="chat-input-bar">
+    <textarea class="chat-input-field" id="c-chat-input" rows="1" placeholder="Message..." oninput="autoResize(this)" onkeydown="handleEnterClient(event, this)"></textarea>
+    <button class="chat-send-btn" onclick="sendClientMessage()">
+      <svg viewBox="0 0 24 24" fill="white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+  <!-- ✅ NO BOTTOM NAV HERE — this is full screen like WhatsApp -->
+
+</section>
+
+<!-- C3: CLIENT HISTORY -->
+<section class="screen" id="screen-c-history">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-c-home')">←</button>
+    <div class="top-bar-center"><div class="top-bar-title">My History</div></div>
+    <div style="width:36px"></div>
+  </div>
+  <div class="scroll-content">
+    <div style="padding:16px">
+      <div class="filter-tabs" style="padding:0 0 12px">
+        <button class="filter-tab active">This Week</button>
+        <button class="filter-tab">This Month</button>
+        <button class="filter-tab">All Time</button>
+      </div>
+      <div class="history-item">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+          <div style="font-size:14px; font-weight:600">Mon, Jul 7</div>
+          <span class="badge badge-yellow">⚠️ Partial</span>
+        </div>
+        <div style="font-size:13px; color:var(--text-secondary)">Had 2 of 3 meals. Evening walk done!</div>
+        <div style="font-size:12px; color:var(--text-tertiary); margin-top:6px; font-style:italic">"Haan, breakfast aur dinner accha raha! Lunch skip ho gaya tha..."</div>
+      </div>
+      <div class="history-item">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+          <div style="font-size:14px; font-weight:600">Sun, Jul 6</div>
+          <span class="badge badge-green">✅ On Track</span>
+        </div>
+        <div style="font-size:13px; color:var(--text-secondary)">Great day — all targets met!</div>
+        <div style="font-size:12px; color:var(--text-tertiary); margin-top:6px; font-style:italic">"Aaj sab kuch perfect raha! Teen meals, paani bhi 3 litre 💪"</div>
+      </div>
+      <div class="history-item">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+          <div style="font-size:14px; font-weight:600">Sat, Jul 5</div>
+          <span class="badge badge-yellow">⚠️ Partial</span>
+        </div>
+        <div style="font-size:13px; color:var(--text-secondary)">Tired day — missed lunch due to meeting.</div>
+        <div style="font-size:12px; color:var(--text-tertiary); margin-top:6px; font-style:italic">"Lunch nahi ho paya, meeting thi. Dinner mein compensate kiya."</div>
+      </div>
+      <div class="history-item">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+          <div style="font-size:14px; font-weight:600">Fri, Jul 4</div>
+          <span class="badge badge-green">✅ On Track</span>
+        </div>
+        <div style="font-size:13px; color:var(--text-secondary)">Perfect adherence!</div>
+        <div style="font-size:12px; color:var(--text-tertiary); margin-top:6px; font-style:italic">"Best day this week! Everything on track 🎉"</div>
+      </div>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-item" onclick="goTo('screen-c-home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-checkin')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Check-in</span>
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>History</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-progress')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Progress</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Profile</span>
+    </button>
+  </div>
+</section>
+
+<!-- C4: CLIENT PROGRESS -->
+<section class="screen" id="screen-c-progress">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-c-home')">←</button>
+    <div class="top-bar-center"><div class="top-bar-title">My Progress</div></div>
+    <div style="width:36px"></div>
+  </div>
+  <div class="scroll-content">
+    <div style="padding:16px">
+      <div class="stats-row" style="padding:0; margin-bottom:16px">
+        <div class="stat-card">
+          <div class="stat-num" style="color:var(--color-warning)">🔥</div>
+          <div class="stat-num" style="margin-top:4px">14</div>
+          <div class="stat-label">Day Streak</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num">87%</div>
+          <div class="stat-label">Consistency</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num">28</div>
+          <div class="stat-label">Days Left</div>
+        </div>
+      </div>
+      <div class="section-title mb-sm">Weekly Adherence</div>
+      <div class="chart-wrap">
+        <canvas id="clientAdherenceChart"></canvas>
+      </div>
+      <div class="section-title mb-sm mt-md">Energy Levels</div>
+      <div class="chart-wrap">
+        <canvas id="clientEnergyChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-item" onclick="goTo('screen-c-home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-checkin')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Check-in</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-history')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>History</span>
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Progress</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Profile</span>
+    </button>
+  </div>
+</section>
+
+<!-- C5: CLIENT PROFILE -->
+<section class="screen" id="screen-c-profile">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-c-home')">←</button>
+    <div class="top-bar-center"><div class="top-bar-title">My Profile</div></div>
+    <div style="width:36px"></div>
+  </div>
+  <div class="scroll-content">
+    <div class="profile-hero">
+      <div class="avatar avatar-xl">AS</div>
+      <div style="font-size:20px; font-weight:700">Ananya Sharma</div>
+      <span class="badge badge-green">✅ Active Member</span>
+    </div>
+    <div style="padding:0 16px">
+      <div class="section-title mb-sm">My Nutrition Plan</div>
+      <div class="card mb-md">
+        <div style="font-size:13px; font-weight:600; color:var(--accent-green); margin-bottom:8px">Weight Management Program</div>
+        <div style="font-size:13px; color:var(--text-secondary); line-height:1.7">
+          1400 kcal/day · No sugar · 3L water daily · High protein breakfast · Evening walk 30 mins
+        </div>
+      </div>
+
+      <div class="section-title mb-sm">Subscription</div>
+      <div class="card mb-md">
+        <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px">
+          <span style="color:var(--text-tertiary)">Start</span><span>Jun 4, 2026</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:12px">
+          <span style="color:var(--text-tertiary)">End</span><span>Aug 3, 2026</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" style="width:55%"></div>
+        </div>
+        <div style="font-size:12px; color:var(--text-tertiary); margin-top:6px; text-align:center">28 days remaining in your program</div>
+      </div>
+
+      <div class="section-title mb-sm">My Support Team</div>
+      <div class="card mb-md">
+        <div style="display:flex; align-items:center; gap:10px; padding-bottom:12px; border-bottom:1px solid var(--border-color); margin-bottom:12px">
+          <div class="avatar avatar-sm">PM</div>
+          <div>
+            <div style="font-size:14px; font-weight:600">Dr. Priya Mehta</div>
+            <div style="font-size:12px; color:var(--text-tertiary)">Your Nutritionist</div>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px">
+          <div class="avatar avatar-sm" style="background: linear-gradient(135deg, #5B9CF6, #2563EB)">SH</div>
+          <div>
+            <div style="font-size:14px; font-weight:600">Sunita Sharma</div>
+            <div style="font-size:12px; color:var(--text-tertiary)">Your Caretaker (Mom)</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-secondary btn-full mb-sm" onclick="goTo('screen-role')">Switch to Nutritionist View</button>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-item" onclick="goTo('screen-c-home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-checkin')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Check-in</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-history')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>History</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-c-progress')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Progress</span>
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Profile</span>
+    </button>
+  </div>
+</section>
+
+<!-- N-CLIENTS (All Clients full list) -->
+<section class="screen" id="screen-n-clients">
+  <div class="top-bar">
+    <button class="icon-btn" onclick="goTo('screen-n-dashboard')">←</button>
+    <div class="top-bar-center"><div class="top-bar-title">All Clients</div></div>
+    <button class="icon-btn" onclick="goTo('screen-n-add-client')">＋</button>
+  </div>
+  <div class="scroll-content">
+    <div style="padding:16px">
+      <input class="input mb-md" placeholder="🔍 Search clients..." />
+      <div class="filter-tabs" style="padding:0 0 12px">
+        <button class="filter-tab active">All (4)</button>
+        <button class="filter-tab">Active (3)</button>
+        <button class="filter-tab">Expiring (1)</button>
+        <button class="filter-tab">Past (1)</button>
+      </div>
+      <div class="client-card" onclick="openClient(1)">
+        <div class="client-card-top">
+          <div class="avatar avatar-md">AS</div>
+          <div class="client-card-info">
+            <div class="client-name">Ananya Sharma</div>
+            <div class="client-sub">Weight Management · 28 days left</div>
+          </div>
+          <span class="badge badge-green">✅ Active</span>
+        </div>
+      </div>
+      <div class="client-card flagged" onclick="openClient(2)">
+        <div class="client-card-top">
+          <div class="avatar avatar-md avatar-orange">MP</div>
+          <div class="client-card-info">
+            <div class="client-name">🚨 Meera Patel</div>
+            <div class="client-sub">Diabetic Mgmt · ⚠️ 3 days left</div>
+          </div>
+          <span class="badge badge-yellow">⚠️ Expiring</span>
+        </div>
+      </div>
+      <div class="client-card" onclick="openClient(3)">
+        <div class="client-card-top">
+          <div class="avatar avatar-md avatar-purple">RS</div>
+          <div class="client-card-info">
+            <div class="client-name">Riya Shah</div>
+            <div class="client-sub">Post-Pregnancy · 45 days left</div>
+          </div>
+          <span class="badge badge-green">✅ Active</span>
+        </div>
+      </div>
+      <div class="client-card" style="opacity:0.7" onclick="openClient(4)">
+        <div class="client-card-top">
+          <div class="avatar avatar-md avatar-blue">KJ</div>
+          <div class="client-card-info">
+            <div class="client-name">Kavita Joshi</div>
+            <div class="client-sub">PCOS Mgmt · Completed Jul 1</div>
+          </div>
+          <span class="badge badge-gray">🔴 Past</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-item" onclick="goTo('screen-n-dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Dashboard</span>
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Clients</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-alerts')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span>Alerts</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-subscriptions')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Timeline</span>
+    </button>
+    <button class="nav-item" onclick="goTo('screen-n-settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Settings</span>
+    </button>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- FORGOT PASSWORD / PASSWORD RECOVERY MODAL                  -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="forgot-password-modal" class="modal-overlay">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-header">
+      <div style="display:flex; align-items:center; gap:8px">
+        <span style="font-size:20px">🔐</span>
+        <div>
+          <div class="modal-title" id="forgot-pwd-title">Reset Your Password</div>
+          <div style="font-size:11px; color:var(--text-tertiary)">Secure OTP Recovery</div>
+        </div>
+      </div>
+      <button class="icon-btn" onclick="closeForgotPasswordModal()">✕</button>
+    </div>
+    
+    <div class="modal-body" id="forgot-step-1">
+      <div style="font-size:13px; color:var(--text-secondary); margin-bottom:16px; line-height:1.4">
+        Enter your registered email address or mobile number. We will send a 6-digit verification code to reset your access PIN/password.
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Account Type</label>
+        <select class="input" id="forgot-role-select" style="padding:8px 12px">
+          <option value="nutritionist">🩺 Nutritionist / Doctor Account</option>
+          <option value="client">👩 Client / Patient Account</option>
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Registered Email / WhatsApp Phone</label>
+        <input class="input" id="forgot-email-input" type="text" value="dr.priya@nutricoach.ai" placeholder="e.g. dr.priya@nutricoach.ai or +91..." />
+      </div>
+
+      <button class="btn btn-primary w-full" style="padding:12px; width:100%; margin-top:8px" onclick="sendResetCode()">
+        📨 Send 6-Digit Reset Code →
+      </button>
+    </div>
+
+    <div class="modal-body" id="forgot-step-2" style="display:none">
+      <div style="background:rgba(76,175,130,0.15); border:1px solid var(--accent-green); padding:10px 14px; border-radius:var(--radius-md); font-size:12px; color:var(--accent-green); font-weight:600; margin-bottom:16px; display:flex; align-items:center; gap:8px">
+        <span>💬</span>
+        <span>Recovery code sent to <strong id="forgot-sent-target" style="text-decoration:underline">dr.priya@nutricoach.ai</strong>!</span>
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Enter 6-Digit OTP Code</label>
+        <div style="display:flex; gap:6px; justify-content:space-between; margin-top:4px">
+          <input type="text" value="8" class="input" style="width:44px; text-align:center; font-size:16px; font-weight:700; padding:8px 4px" maxlength="1" />
+          <input type="text" value="2" class="input" style="width:44px; text-align:center; font-size:16px; font-weight:700; padding:8px 4px" maxlength="1" />
+          <input type="text" value="4" class="input" style="width:44px; text-align:center; font-size:16px; font-weight:700; padding:8px 4px" maxlength="1" />
+          <input type="text" value="1" class="input" style="width:44px; text-align:center; font-size:16px; font-weight:700; padding:8px 4px" maxlength="1" />
+          <input type="text" value="9" class="input" style="width:44px; text-align:center; font-size:16px; font-weight:700; padding:8px 4px" maxlength="1" />
+          <input type="text" value="0" class="input" style="width:44px; text-align:center; font-size:16px; font-weight:700; padding:8px 4px" maxlength="1" />
+        </div>
+      </div>
+
+      <div class="input-group mt-sm">
+        <label class="input-label">New Password / PIN</label>
+        <input class="input" type="password" value="••••••••••••" placeholder="Enter new password..." />
+      </div>
+
+      <div class="input-group">
+        <label class="input-label">Confirm New Password / PIN</label>
+        <input class="input" type="password" value="••••••••••••" placeholder="Confirm password..." />
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:12px">
+        <button class="btn btn-ghost flex-1" style="font-size:12px" onclick="openForgotPasswordModal(document.getElementById('forgot-role-select').value)">← Back</button>
+        <button class="btn btn-primary flex-1" style="font-size:12px; padding:12px" onclick="confirmPasswordReset()">
+          🔒 Reset & Sign In →
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- AI SYSTEM PROMPT & CUSTOMER GUIDANCE MODAL                 -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="ai-prompt-modal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div style="display:flex; align-items:center; gap:8px">
+        <span style="font-size:20px">🤖</span>
+        <div>
+          <div class="modal-title" id="ai-modal-title">Configure AI System Prompt</div>
+          <div style="font-size:11px; color:var(--accent-green)">● Backend LLM Rules Connected</div>
+        </div>
+      </div>
+      <button class="icon-btn" onclick="closeAIPromptModal()">✕</button>
+    </div>
+    
+    <div class="modal-body">
+      <!-- Master System Prompt Section -->
+      <div id="ai-modal-master-sec" style="background:var(--bg-tertiary); padding:12px; border-radius:var(--radius-md); border:1px solid var(--border-color)">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-tertiary); margin-bottom:6px; display:flex; justify-content:space-between">
+          <span>🧠 Backend Master Persona (Base LLM Prompt)</span>
+          <span style="color:var(--accent-green); cursor:pointer" onclick="toggleMasterPromptEdit()">[Edit]</span>
+        </div>
+        <div id="ai-master-prompt-view" style="font-size:12px; color:var(--text-secondary); line-height:1.4; font-family:monospace">"You are NutriCoach AI, clinical nutrition assistant to Dr. Priya Mehta. Classify check-ins as on_track, partial, or off_track. Maintain a warm tone. NEVER prescribe dietary substitutions or advise on pain — immediately escalate to Dr. Priya."</div>
+        <textarea id="ai-master-prompt-input" class="input mt-xs" rows="4" style="display:none; font-size:12px; font-family:monospace">You are NutriCoach AI, clinical nutrition assistant to Dr. Priya Mehta. Classify check-ins as on_track, partial, or off_track. Maintain a warm tone. NEVER prescribe dietary substitutions or advise on pain — immediately escalate to Dr. Priya.</textarea>
+      </div>
+
+      <!-- Client Specific Guidance Rules Section -->
+      <div id="ai-modal-client-sec">
+        <div style="font-size:13px; font-weight:700; color:var(--text-primary); margin-bottom:4px">
+          Personalized AI Rules for <span id="ai-modal-client-name" style="color:var(--accent-green)">Ananya Sharma</span>
+        </div>
+        <div style="font-size:12px; color:var(--text-tertiary); margin-bottom:12px">
+          These custom notes are dynamically injected into the backend prompt whenever AI chats with this client.
+        </div>
+
+        <!-- List of active rules -->
+        <div id="ai-modal-rules-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px">
+          <!-- Rendered by JS -->
+        </div>
+
+        <!-- Add New Rule Form -->
+        <div style="background:var(--bg-primary); padding:12px; border-radius:var(--radius-md); border:1px dashed var(--border-color-strong)">
+          <div style="font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:8px">＋ Add New Custom Prompt Rule</div>
+          <div style="display:flex; gap:8px; margin-bottom:8px">
+            <select id="ai-new-rule-label" class="input" style="flex:1; font-size:12px; padding:6px 10px; cursor:pointer">
+              <option value="Tone">Tone & Style 🗣️</option>
+              <option value="Language">Language 🌐</option>
+              <option value="Avoid">Topics to Avoid 🚫</option>
+              <option value="Medical">Medical Alert ⚠️</option>
+              <option value="Caretaker">Caretaker Rule 👨‍👩‍👧</option>
+              <option value="Custom">Custom Rule ⭐</option>
+            </select>
+          </div>
+          <textarea id="ai-new-rule-text" class="input" rows="2" style="font-size:12px; margin-bottom:8px" placeholder="e.g. Warn her if she skips breakfast because of diabetes..."></textarea>
+          <button class="btn btn-sm btn-secondary w-full" style="font-size:12px; width:100%" onclick="addClientAIRule()">＋ Add Rule to Client Persona</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-ghost" onclick="closeAIPromptModal()">Cancel</button>
+      <button class="btn btn-sm btn-primary" onclick="saveAIPromptBackend()">💾 Save Prompt to Backend</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Notification -->
+<div id="toast" style="position:fixed; bottom:calc(var(--nav-height)+20px); left:50%; transform:translateX(-50%) translateY(20px); background:var(--bg-elevated); color:var(--text-primary); padding:12px 20px; border-radius:var(--radius-pill); font-size:13px; font-weight:500; box-shadow:var(--shadow-lg); border:1px solid var(--border-color-strong); z-index:9999; opacity:0; transition:all 0.3s ease; white-space:nowrap; max-width:300px; text-align:center; pointer-events:none;"></div>
+
+</div><!-- end #app -->
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SCRIPTS                                                    -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script src="js/data.js"></script>
+<script>
+
+// ── Router ────────────────────────────────────────────────────
+let currentScreen = 'screen-role';
+let chartsInitialized = {};
+
+function goTo(screenId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const target = document.getElementById(screenId);
+  if (target) {
+    target.classList.add('active');
+    target.scrollTop = 0;
+    currentScreen = screenId;
+    // Init charts if needed
+    if (screenId === 'screen-n-profile') initProfileCharts();
+    if (screenId === 'screen-c-progress') initClientCharts();
+    if (screenId === 'screen-n-dashboard' || screenId === 'screen-n-settings' || screenId === 'screen-admin') {
+      if (typeof updateNutritionistSubscriptionUI === 'function') updateNutritionistSubscriptionUI();
+      if (typeof updateAdminDoc1UI === 'function') updateAdminDoc1UI();
+    }
+    if (screenId === 'screen-n-chat') {
+      requestAnimationFrame(() => {
+        const c = document.getElementById('nutritionist-chat-messages');
+        if (c) c.scrollTop = c.scrollHeight;
+      });
+    }
+    if (screenId === 'screen-c-checkin') {
+      requestAnimationFrame(() => {
+        const c = document.getElementById('client-chat-messages');
+        if (c) c.scrollTop = c.scrollHeight;
+      });
+    }
+  }
+}
+
+
+// ── Theme Toggle ──────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('theme-icon').textContent = isDark ? '🌙' : '☀️';
+  // Reinit charts on theme change
+  if (currentScreen === 'screen-n-profile') {
+    chartsInitialized['profile'] = false;
+    initProfileCharts();
+  }
+  if (currentScreen === 'screen-c-progress') {
+    chartsInitialized['client'] = false;
+    initClientCharts();
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateX(-50%) translateY(0)';
+  setTimeout(() => {
+    t.style.opacity = '0';
+    t.style.transform = 'translateX(-50%) translateY(20px)';
+  }, 2800);
+}
+
+// ── Open Client Profile ───────────────────────────────────────
+let currentClientId = 1;
+
+function openClient(id) {
+  currentClientId = id;
+  const client = getClient(id);
+  if (!client) return;
+
+  // Reset to overview tab
+  switchProfileTab('overview', document.querySelector('#screen-n-profile .tab-item'));
+
+  // Populate header
+  document.getElementById('profile-name-header').textContent = client.name;
+  document.getElementById('profile-name').textContent = client.name;
+  document.getElementById('profile-plan-type').textContent = client.plan_type + ' Plan';
+
+  // Avatar
+  const avatar = document.getElementById('profile-avatar');
+  avatar.textContent = client.initials;
+  avatar.className = 'avatar avatar-xl ' + client.avatar_color;
+
+  // Status badge
+  const sb = getStatusBadge(client.status);
+  const badge = document.getElementById('profile-status-badge');
+  badge.textContent = sb.text;
+  badge.className = 'badge ' + sb.cls;
+
+  // Days left
+  const daysEl = document.getElementById('profile-days-left');
+  if (client.status === 'expired') {
+    daysEl.textContent = 'Program completed';
+    daysEl.style.color = 'var(--color-danger)';
+  } else {
+    daysEl.textContent = client.days_left + ' days remaining';
+    daysEl.style.color = '';
+  }
+
+  // Overview stats
+  document.getElementById('profile-streak').textContent = client.streak;
+  document.getElementById('profile-consistency').textContent = client.consistency + '%';
+
+  // Adherence card
+  const adhBadge = getAdherenceBadge(client.adherence_today || 'unclear');
+  const adhCard = document.getElementById('profile-adherence-card');
+  adhCard.querySelector('.stat-num').textContent = adhBadge.text.split(' ')[0];
+  adhCard.querySelector('.stat-label').textContent = adhBadge.text.split(' ').slice(1).join(' ') || 'Today';
+
+  // Subscription
+  document.getElementById('profile-sub-dates').textContent =
+    formatDate(client.start_date) + ' → ' + formatDate(client.end_date);
+  const subBadge = getStatusBadge(client.status);
+  const subBadgeEl = document.getElementById('profile-sub-badge');
+  subBadgeEl.textContent = subBadge.text;
+  subBadgeEl.className = 'badge ' + subBadge.cls;
+
+  const progress = Math.round((client.days_used / client.duration_days) * 100);
+  const progressBar = document.getElementById('profile-sub-progress');
+  progressBar.style.width = progress + '%';
+  if (client.days_left <= 7) progressBar.className = 'progress-bar-fill warning';
+  else progressBar.className = 'progress-bar-fill';
+
+  document.getElementById('profile-sub-used').textContent = client.days_used + ' days used';
+  document.getElementById('profile-sub-left').textContent = client.days_left + ' days left';
+
+  // Caretaker
+  document.getElementById('profile-caretaker').textContent = client.caretaker;
+
+  // AI Instructions
+  renderInstructions('profile-ai-instructions', client.ai_instructions);
+  renderInstructions('plan-tab-instructions', client.ai_instructions, true);
+
+  // Plan text
+  document.getElementById('profile-plan-text').textContent = client.plan_summary;
+
+  // Chat
+  renderChat('profile-chat', client.todays_chat);
+
+  // History
+  renderHistory('profile-history-list', client.history);
+
+  // Data card for today
+  if (client.adherence_today) {
+    const adhB = getAdherenceBadge(client.adherence_today);
+    document.getElementById('profile-data-card').querySelector('.data-badges').innerHTML = `
+      <span class="badge ${adhB.cls}">${adhB.text}</span>
+      <span class="badge badge-blue">📝 Caretaker Note</span>
+    `;
+  }
+
+  // Expired client message override
+  if (client.status === 'expired') {
+    const chatEl = document.getElementById('profile-chat');
+    chatEl.innerHTML = `<div style="text-align:center; padding:30px; color:var(--text-tertiary); font-size:14px">
+      📁 This client's program has ended.<br><br>
+      <em style="font-size:13px">${client.final_note || 'Program completed.'}</em><br><br>
+      <button class="btn btn-primary" onclick="showToast('Reactivating Kavita...')">🔄 Reactivate Client</button>
+    </div>`;
+  }
+
+  chartsInitialized['profile'] = false;
+  goTo('screen-n-profile');
+}
+
+function renderInstructions(containerId, instructions, full = false) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!instructions || instructions.length === 0) {
+    el.innerHTML = `<div style="font-size:13px; color:var(--text-tertiary); font-style:italic; cursor:pointer" onclick="openAIPromptModal('client')">No custom instructions yet. Tap ＋ Add to add guidance for the AI.</div>`;
+    return;
+  }
+  el.innerHTML = instructions.map((ins, idx) => `
+    <div class="instruction-tag" style="cursor:pointer; ${full ? 'display:flex; padding:10px 14px;' : ''}" onclick="openAIPromptModal('client')" title="Click to edit AI instructions">
+      <span class="tag-label">${ins.label}:</span>
+      <span>${ins.text}</span>
+      ${full ? '<span style="margin-left:auto; color:var(--text-tertiary); font-size:11px">✏️</span>' : '<span style="font-size:10px; opacity:0.6; margin-left:4px">✏️</span>'}
+    </div>
+  `).join('');
+}
+
+// ── AI Prompt Modal Configuration ─────────────────────────────
+let aiModalMode = 'client'; // 'client' or 'global'
+
+function openAIPromptModal(mode = 'client') {
+  aiModalMode = mode;
+  const modal = document.getElementById('ai-prompt-modal');
+  const client = typeof getClient === 'function' ? (getClient(currentClientId) || APP_DATA.clients[0]) : APP_DATA.clients[0];
+  
+  if (mode === 'global') {
+    document.getElementById('ai-modal-title').textContent = 'Global AI Backend Prompt';
+    document.getElementById('ai-modal-client-sec').style.display = 'none';
+    document.getElementById('ai-modal-master-sec').style.display = 'block';
+    toggleMasterPromptEdit(true);
+  } else {
+    document.getElementById('ai-modal-title').textContent = 'Configure AI Customer Prompt';
+    document.getElementById('ai-modal-client-sec').style.display = 'block';
+    document.getElementById('ai-modal-master-sec').style.display = 'block';
+    document.getElementById('ai-modal-client-name').textContent = client.name;
+    renderAIModalRules();
+  }
+  
+  modal.classList.add('active');
+}
+
+function closeAIPromptModal() {
+  document.getElementById('ai-prompt-modal').classList.remove('active');
+}
+
+function toggleMasterPromptEdit(forceOpen = false) {
+  const view = document.getElementById('ai-master-prompt-view');
+  const input = document.getElementById('ai-master-prompt-input');
+  if (forceOpen || view.style.display !== 'none') {
+    view.style.display = 'none';
+    input.style.display = 'block';
+  } else {
+    view.style.display = 'block';
+    input.style.display = 'none';
+    view.textContent = '"' + input.value + '"';
+  }
+}
+
+function renderAIModalRules() {
+  const client = typeof getClient === 'function' ? (getClient(currentClientId) || APP_DATA.clients[0]) : APP_DATA.clients[0];
+  if (!client) return;
+  const list = document.getElementById('ai-modal-rules-list');
+  if (!client.ai_instructions || client.ai_instructions.length === 0) {
+    list.innerHTML = `<div style="font-size:12px; color:var(--text-tertiary); font-style:italic">No custom rules for this client yet.</div>`;
+    return;
+  }
+  list.innerHTML = client.ai_instructions.map((ins, idx) => `
+    <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg-tertiary); padding:8px 12px; border-radius:var(--radius-md); border:1px solid var(--border-color); font-size:12px;">
+      <div style="flex:1; min-width:0; margin-right:8px">
+        <span style="font-weight:700; color:var(--accent-green)">${ins.label}:</span> 
+        <span style="color:var(--text-secondary)">${ins.text}</span>
+      </div>
+      <button class="icon-btn" style="width:26px; height:26px; color:var(--color-danger)" onclick="deleteClientAIRule(${idx})" title="Delete rule">🗑️</button>
+    </div>
+  `).join('');
+}
+
+function addClientAIRule() {
+  const client = typeof getClient === 'function' ? (getClient(currentClientId) || APP_DATA.clients[0]) : APP_DATA.clients[0];
+  if (!client) return;
+  const labelEl = document.getElementById('ai-new-rule-label');
+  const textEl = document.getElementById('ai-new-rule-text');
+  const text = textEl.value.trim();
+  if (!text) {
+    showToast('⚠️ Please enter rule instruction text');
+    return;
+  }
+  if (!client.ai_instructions) client.ai_instructions = [];
+  client.ai_instructions.push({ label: labelEl.value, text: text });
+  textEl.value = '';
+  renderAIModalRules();
+  // Also update background tabs
+  renderInstructions('profile-ai-instructions', client.ai_instructions);
+  renderInstructions('plan-tab-instructions', client.ai_instructions, true);
+  showToast('＋ Rule added to client persona!');
+}
+
+function deleteClientAIRule(idx) {
+  const client = typeof getClient === 'function' ? (getClient(currentClientId) || APP_DATA.clients[0]) : APP_DATA.clients[0];
+  if (!client || !client.ai_instructions) return;
+  client.ai_instructions.splice(idx, 1);
+  renderAIModalRules();
+  renderInstructions('profile-ai-instructions', client.ai_instructions);
+  renderInstructions('plan-tab-instructions', client.ai_instructions, true);
+  showToast('🗑️ Rule removed');
+}
+
+function saveAIPromptBackend() {
+  if (aiModalMode === 'global') {
+    const val = document.getElementById('ai-master-prompt-input').value;
+    document.getElementById('ai-master-prompt-view').textContent = '"' + val + '"';
+  }
+  closeAIPromptModal();
+  showToast('✅ Saved AI Prompt to Backend LLM!');
+}
+
+function renderChat(containerId, messages) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!messages || messages.length === 0) {
+    el.innerHTML = `<div style="text-align:center; padding:40px 20px; color:var(--text-tertiary); font-size:14px">No messages today yet.</div>`;
+    return;
+  }
+
+  const roleMap = {
+    bot:          { rowClass: 'incoming',         avatarText: 'AI', avatarClass: '',       nameClass: 'msg-incoming-name',    nameLabel: '🤖 AI Coach' },
+    client:       { rowClass: 'outgoing',         avatarText: '',   avatarClass: 'hidden', nameClass: '',                     nameLabel: '' },
+    caretaker:    { rowClass: 'caretaker-msg outgoing', avatarText: 'SM', avatarClass: 'purple', nameClass: 'msg-caretaker-name', nameLabel: '💜 Caretaker' },
+    nutritionist: { rowClass: 'nutritionist-msg outgoing', avatarText: 'Dr', avatarClass: 'blue', nameClass: 'msg-nutritionist-name', nameLabel: '👩‍⚕️ Dr. Priya' },
+  };
+
+  el.innerHTML = `<div class="date-sep">Today — July 7</div>` + messages.map(msg => {
+    const r = roleMap[msg.role] || roleMap.client;
+    const isIncoming = msg.role === 'bot';
+    return `
+    <div class="msg-row ${r.rowClass}">
+      ${isIncoming ? `<div class="msg-avatar ${r.avatarClass}">${r.avatarText}</div>` : ''}
+      <div class="msg-bubble-wrap">
+        ${r.nameLabel ? `<div class="msg-sender-name ${r.nameClass}" ${!isIncoming ? 'style="text-align:right"' : ''}>${r.nameLabel}</div>` : ''}
+        <div class="msg-bubble">${msg.text}</div>
+        <div class="msg-time">${msg.time}</div>
+      </div>
+      ${!isIncoming ? `<div class="msg-avatar ${r.avatarClass}" ${r.avatarClass === 'hidden' ? '' : ''}>${r.avatarText}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  // Auto-scroll to bottom (latest message)
+  requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+}
+
+function renderHistory(containerId, history) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!history || history.length === 0) {
+    el.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-tertiary)">No history available.</div>`;
+    return;
+  }
+  const adhMap = {
+    on_track:  { cls: 'badge-green',  text: '✅ On Track' },
+    partial:   { cls: 'badge-yellow', text: '⚠️ Partial' },
+    off_track: { cls: 'badge-red',    text: '❌ Off Track' },
+    unclear:   { cls: 'badge-gray',   text: '❓ No Response' },
+  };
+  el.innerHTML = history.map(h => {
+    const b = adhMap[h.adherence] || adhMap.unclear;
+    return `
+    <div class="history-item">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+        <div style="font-size:14px; font-weight:600">${h.date}</div>
+        <span class="badge ${b.cls}">${b.text}</span>
+      </div>
+      <div style="font-size:13px; color:var(--text-secondary)">${h.summary}</div>
+      ${h.mood && h.mood !== '—' ? `<div style="font-size:12px; color:var(--text-tertiary); margin-top:4px">Mood: ${h.mood} · Energy: ${h.energy || '—'}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── Profile Tab Switcher ──────────────────────────────────────
+function switchProfileTab(tabName, clickedEl) {
+  document.querySelectorAll('#screen-n-profile .tab-item').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#screen-n-profile .tab-content').forEach(t => t.classList.remove('active'));
+  if (clickedEl) clickedEl.classList.add('active');
+  const content = document.getElementById('tab-' + tabName);
+  if (content) content.classList.add('active');
+  if (tabName === 'analytics') initProfileCharts();
+}
+
+// ── Step Form ─────────────────────────────────────────────────
+function nextStep(step) {
+  document.querySelectorAll('.step-content').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-' + step).classList.add('active');
+  document.querySelectorAll('.step-dot').forEach((d, i) => {
+    d.className = 'step-dot';
+    if (i < step - 1) d.classList.add('done');
+    if (i === step - 1) d.classList.add('active');
+  });
+}
+
+// ── Client Filter ─────────────────────────────────────────────
+function filterClients(filter, btn) {
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const cards = document.querySelectorAll('#client-list .client-card');
+  cards.forEach(card => {
+    const status = card.dataset.status;
+    const attention = card.dataset.attention === 'true';
+    const responded = card.dataset.responded === 'true';
+    let show = true;
+    if (filter === 'attention') show = attention;
+    else if (filter === 'no_response') show = !responded;
+    else if (filter === 'expiring') show = status === 'expiring';
+    else if (filter === 'past') show = status === 'expired';
+    card.style.display = show ? '' : 'none';
+  });
+}
+
+// ── Charts ────────────────────────────────────────────────────
+function getChartColors() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  return {
+    grid: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+    text: isDark ? '#98989F' : '#48484A',
+    green: isDark ? '#4CAF82' : '#34A86A',
+    greenBg: isDark ? 'rgba(76,175,130,0.15)' : 'rgba(52,168,106,0.12)',
+    orange: isDark ? '#F5A623' : '#D97706',
+    orangeBg: isDark ? 'rgba(245,166,35,0.15)' : 'rgba(217,119,6,0.12)',
+  };
+}
+
+function initProfileCharts() {
+  if (chartsInitialized['profile']) return;
+  chartsInitialized['profile'] = true;
+
+  const client = getClient(currentClientId) || APP_DATA.clients[0];
+  const c = getChartColors();
+  const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: c.grid }, ticks: { color: c.text, font: { size: 11 } } },
+      y: { grid: { color: c.grid }, ticks: { color: c.text, font: { size: 11 } }, beginAtZero: true }
+    }
+  };
+
+  // Destroy if exists
+  Chart.getChart('adherenceChart')?.destroy();
+  Chart.getChart('energyChart')?.destroy();
+
+  new Chart(document.getElementById('adherenceChart'), {
+    type: 'line',
+    data: {
+      labels: client.weekly_data.labels,
+      datasets: [{
+        data: client.weekly_data.adherence,
+        borderColor: c.green,
+        backgroundColor: c.greenBg,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: c.green,
+        pointRadius: 4,
+      }]
+    },
+    options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, max: 100 } } }
+  });
+
+  new Chart(document.getElementById('energyChart'), {
+    type: 'bar',
+    data: {
+      labels: client.weekly_data.labels,
+      datasets: [{
+        data: client.weekly_data.energy,
+        backgroundColor: client.weekly_data.energy.map(v => v >= 4 ? c.green : v >= 3 ? c.orange : 'rgba(255,95,95,0.6)'),
+        borderRadius: 6,
+      }]
+    },
+    options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, max: 5, ticks: { ...chartDefaults.scales.y.ticks, callback: v => ['', '🪫 Low', '', '⚡ Med', '', '🔋 High'][v] || v } } } }
+  });
+}
+
+function initClientCharts() {
+  if (chartsInitialized['client']) return;
+  chartsInitialized['client'] = true;
+
+  const client = APP_DATA.clients[0];
+  const c = getChartColors();
+  const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: c.grid }, ticks: { color: c.text, font: { size: 11 } } },
+      y: { grid: { color: c.grid }, ticks: { color: c.text, font: { size: 11 } }, beginAtZero: true }
+    }
+  };
+
+  Chart.getChart('clientAdherenceChart')?.destroy();
+  Chart.getChart('clientEnergyChart')?.destroy();
+
+  new Chart(document.getElementById('clientAdherenceChart'), {
+    type: 'line',
+    data: {
+      labels: client.weekly_data.labels,
+      datasets: [{
+        data: client.weekly_data.adherence,
+        borderColor: c.green,
+        backgroundColor: c.greenBg,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: c.green,
+        pointRadius: 4,
+      }]
+    },
+    options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, max: 100 } } }
+  });
+
+  new Chart(document.getElementById('clientEnergyChart'), {
+    type: 'bar',
+    data: {
+      labels: client.weekly_data.labels,
+      datasets: [{
+        data: client.weekly_data.energy,
+        backgroundColor: client.weekly_data.energy.map(v => v >= 4 ? c.green : c.orange),
+        borderRadius: 6,
+      }]
+    },
+    options: chartDefaults
+  });
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// ── Auto-resize textarea ──────────────────────────────────────
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+// ── Client Chat Actions ───────────────────────────────────────
+function sendClientMessage() {
+  const input = document.getElementById('c-chat-input');
+  if (!input || !input.value.trim()) return;
+  const text = input.value.trim();
+  const client = APP_DATA.clients[0]; // Ananya
+  
+  client.todays_chat.push({ role: 'client', text: text, time: 'Now' });
+  renderChat('client-chat-messages', client.todays_chat);
+  
+  setTimeout(() => {
+    if (text.toLowerCase().includes('protein') || text.toLowerCase().includes('change') || text.toLowerCase().includes('pain') || text.toLowerCase().includes('hurt') || text.toLowerCase().includes('doctor')) {
+      client.todays_chat.push({
+        role: 'bot',
+        text: 'I understand, Ananya! 🌿 Since this involves a dietary or medical adjustment to your specific plan, **I have escalated this question to Dr. Priya for clinical review.** She will reply to you here shortly! 👩‍⚕️',
+        time: 'Now'
+      });
+      client.pending_query = {
+        id: 'q_' + Date.now(),
+        time: 'Now',
+        question: text,
+        status: 'pending',
+        ai_reason: 'Client requested dietary substitution / reported physical discomfort. Requires Doctor approval.'
+      };
+      showToast('⚠️ Question escalated to Dr. Priya!');
+    } else {
+      client.todays_chat.push({
+        role: 'bot',
+        text: 'Got it, Ananya! Keep up the consistency. Make sure to stay hydrated! 💪 🌿',
+        time: 'Now'
+      });
+      showToast('🤖 AI answered automatically!');
+    }
+    renderChat('client-chat-messages', client.todays_chat);
+  }, 600);
+
+  input.value = '';
+  autoResize(input);
+}
+
+function handleEnterClient(e, el) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendClientMessage();
+  }
+}
+
+// ── Doctor / Nutritionist Chat Actions ────────────────────────
+function openNutritionistChat(clientId) {
+  currentClientId = clientId || currentClientId || 1;
+  const client = APP_DATA.clients.find(c => c.id === currentClientId) || APP_DATA.clients[0];
+  
+  document.getElementById('n-chat-avatar').textContent = client.initials;
+  document.getElementById('n-chat-avatar').className = 'avatar avatar-sm ' + (client.avatar_color || '');
+  document.getElementById('n-chat-name').textContent = client.name;
+  document.getElementById('n-chat-sub').textContent = '● ' + client.plan_type + ' · Active';
+  
+  const banner = document.getElementById('n-chat-pending-banner');
+  if (client.pending_query && client.pending_query.status === 'pending') {
+    banner.style.display = 'block';
+    document.getElementById('n-chat-pending-q').textContent = '"' + client.pending_query.question + '"';
+    document.getElementById('n-chat-pending-reason').innerHTML = '🤖 <strong>AI Note:</strong> ' + client.pending_query.ai_reason;
+  } else {
+    banner.style.display = 'none';
+  }
+  
+  renderChat('nutritionist-chat-messages', client.todays_chat);
+  goTo('screen-n-chat');
+}
+
+function sendDoctorMessage() {
+  const input = document.getElementById('n-chat-input');
+  if (!input || !input.value.trim()) return;
+  const text = input.value.trim();
+  const client = APP_DATA.clients.find(c => c.id === currentClientId) || APP_DATA.clients[0];
+  
+  client.todays_chat.push({ role: 'nutritionist', text: text, time: 'Now' });
+  
+  if (client.pending_query && client.pending_query.status === 'pending') {
+    client.pending_query.status = 'resolved';
+    document.getElementById('n-chat-pending-banner').style.display = 'none';
+  }
+  
+  input.value = '';
+  autoResize(input);
+  renderChat('nutritionist-chat-messages', client.todays_chat);
+  showToast('✅ Message sent to ' + client.name);
+}
+
+function resolvePendingQuery(action) {
+  const client = APP_DATA.clients.find(c => c.id === currentClientId) || APP_DATA.clients[0];
+  if (!client.pending_query) return;
+  
+  if (action === 'approved') {
+    const input = document.getElementById('n-chat-input');
+    input.value = "Yes Ananya, you can take 1 scoop whey protein after dinner instead of your walk today since your knees are hurting. Make sure to drink 3L water! 👩‍⚕️";
+    autoResize(input);
+    input.focus();
+    showToast('Drafted doctor reply — click Send!');
+  } else if (action === 'ai_handle') {
+    client.todays_chat.push({
+      role: 'bot',
+      text: 'Dr. Priya reviewed your note: Please try to do a gentle 15-minute walk indoors if possible, or skip today without adding whey protein to keep calories on track. Rest your knees! 🌿',
+      time: 'Now'
+    });
+    client.pending_query.status = 'resolved';
+    document.getElementById('n-chat-pending-banner').style.display = 'none';
+    renderChat('nutritionist-chat-messages', client.todays_chat);
+    showToast('🤖 Handled via AI rule!');
+  }
+}
+
+function handleEnterDoc(e, el) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendDoctorMessage();
+  }
+}
+
+// ── SaaS Platform Admin & Auth Management ─────────────────────
+let drPriyaStatus = 'active'; // 'active' or 'paused'
+
+function switchAuthTab(tab) {
+  const signinBtn = document.getElementById('auth-tab-btn-signin');
+  const signupBtn = document.getElementById('auth-tab-btn-signup');
+  const signinForm = document.getElementById('auth-form-signin');
+  const signupForm = document.getElementById('auth-form-signup');
+  if (!signinBtn || !signupBtn) return;
+  if (tab === 'signin') {
+    signinBtn.classList.add('active');
+    signupBtn.classList.remove('active');
+    signinForm.style.display = 'block';
+    signupForm.style.display = 'none';
+  } else {
+    signupBtn.classList.add('active');
+    signinBtn.classList.remove('active');
+    signupForm.style.display = 'block';
+    signinForm.style.display = 'none';
+  }
+}
+
+function doNutritionistLogin() {
+  if (drPriyaStatus === 'paused') {
+    showToast('⚠️ Notice: Your Platform subscription is currently Paused');
+  } else {
+    showToast('✅ Welcome back, Dr. Priya!');
+  }
+  goTo('screen-n-dashboard');
+}
+
+function toggleDoctorStatus(docId) {
+  if (docId === 1) { // Dr. Priya Mehta
+    drPriyaStatus = drPriyaStatus === 'active' ? 'paused' : 'active';
+    updateAdminDoc1UI();
+    updateNutritionistSubscriptionUI();
+    showToast(drPriyaStatus === 'active' ? '✅ Dr. Priya subscription Reactivated!' : '⏸️ Dr. Priya subscription Paused!');
+  }
+}
+
+function updateAdminDoc1UI() {
+  const badge = document.getElementById('admin-badge-1');
+  const btn = document.getElementById('admin-toggle-btn-1');
+  const card = document.getElementById('admin-doc-1');
+  if (!badge || !btn || !card) return;
+  if (drPriyaStatus === 'active') {
+    badge.textContent = '✅ Active Plan';
+    badge.className = 'badge badge-green';
+    btn.textContent = '⏸️ Pause Subscription';
+    btn.className = 'btn btn-sm btn-secondary';
+    card.style.borderLeftColor = 'var(--accent-green)';
+    card.style.opacity = '1';
+  } else {
+    badge.textContent = '⏸️ Paused by Admin';
+    badge.className = 'badge badge-red';
+    btn.textContent = '▶️ Reactivate Subscription';
+    btn.className = 'btn btn-sm btn-primary';
+    card.style.borderLeftColor = 'var(--color-danger)';
+    card.style.opacity = '0.85';
+  }
+}
+
+function updateNutritionistSubscriptionUI() {
+  const dashBanner = document.getElementById('n-dashboard-paused-banner');
+  const setBadge = document.getElementById('n-settings-status-badge');
+  const setDays = document.getElementById('n-settings-days-left');
+  const setMsg = document.getElementById('n-settings-paused-msg');
+  const setBox = document.getElementById('n-settings-sub-box');
+  
+  if (dashBanner) dashBanner.style.display = drPriyaStatus === 'paused' ? 'block' : 'none';
+  
+  if (setBadge) {
+    if (drPriyaStatus === 'active') {
+      setBadge.textContent = '✅ Active';
+      setBadge.className = 'badge badge-green';
+      if (setDays) {
+        setDays.textContent = '(55 days remaining)';
+        setDays.style.color = 'var(--accent-green)';
+      }
+      if (setMsg) setMsg.style.display = 'none';
+      if (setBox) {
+        setBox.style.borderColor = 'rgba(76,175,130,0.3)';
+        setBox.style.background = 'linear-gradient(135deg, rgba(76,175,130,0.08), rgba(0,0,0,0))';
+      }
+    } else {
+      setBadge.textContent = '⏸️ Paused / Inactive';
+      setBadge.className = 'badge badge-red';
+      if (setDays) {
+        setDays.textContent = '(Access Suspended)';
+        setDays.style.color = 'var(--color-danger)';
+      }
+      if (setMsg) setMsg.style.display = 'block';
+      if (setBox) {
+        setBox.style.borderColor = 'rgba(239,68,68,0.4)';
+        setBox.style.background = 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(0,0,0,0))';
+      }
+    }
+  }
+}
+
+// ── Forgot Password & Admin Approval JS ───────────────────────
+function openForgotPasswordModal(role = 'nutritionist') {
+  const modal = document.getElementById('forgot-password-modal');
+  const roleSelect = document.getElementById('forgot-role-select');
+  const emailInput = document.getElementById('forgot-email-input');
+  
+  if (roleSelect) roleSelect.value = role;
+  if (emailInput) {
+    emailInput.value = role === 'client' ? '+91 98765 43210' : 'dr.priya@nutricoach.ai';
+  }
+  
+  const step1 = document.getElementById('forgot-step-1');
+  const step2 = document.getElementById('forgot-step-2');
+  if (step1) step1.style.display = 'block';
+  if (step2) step2.style.display = 'none';
+  if (modal) modal.classList.add('active');
+}
+
+function closeForgotPasswordModal() {
+  const modal = document.getElementById('forgot-password-modal');
+  if (modal) modal.classList.remove('active');
+}
+
+function sendResetCode() {
+  const emailInput = document.getElementById('forgot-email-input');
+  const target = emailInput ? emailInput.value : 'your registered contact';
+  const sentEl = document.getElementById('forgot-sent-target');
+  if (sentEl) sentEl.textContent = target;
+  
+  const step1 = document.getElementById('forgot-step-1');
+  const step2 = document.getElementById('forgot-step-2');
+  if (step1) step1.style.display = 'none';
+  if (step2) step2.style.display = 'block';
+  showToast('📨 6-Digit OTP Recovery Code Sent!');
+}
+
+function confirmPasswordReset() {
+  closeForgotPasswordModal();
+  showToast('🎉 Password reset successfully! You can now log in.');
+}
+
+function submitDoctorSignup() {
+  showToast('⏳ Registration submitted! Pending verification by Admin.');
+  goTo('screen-role');
+}
+
+function approveDoctorPending() {
+  const badge = document.getElementById('admin-badge-pending');
+  const btnRow = document.getElementById('admin-pending-btn-row');
+  const card = document.getElementById('admin-doc-pending');
+  if (!badge || !btnRow || !card) return;
+  
+  badge.textContent = '✅ Verified & Active';
+  badge.className = 'badge badge-green';
+  card.style.border = 'none';
+  card.style.borderLeft = '4px solid var(--accent-green)';
+  btnRow.innerHTML = `<span style="font-size:12px; color:var(--accent-green); font-weight:600">✅ Approved by Admin today. Doctor has full platform access.</span>`;
+  showToast('🎉 Dr. Rahul Sharma verified & activated!');
+}
+
+// ── Init ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Set initial tab states
+  document.querySelectorAll('.tab-item').forEach(tab => {
+    tab.addEventListener('click', function() {
+      const tabBar = this.closest('.tab-bar');
+      tabBar.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+});
+</script>
+</body>
+</html>
