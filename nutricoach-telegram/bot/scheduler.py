@@ -77,7 +77,8 @@ async def _send_due_checkins():
     if not _bot:
         return
 
-    current_time = datetime.now().strftime("%H:%M")
+    from zoneinfo import ZoneInfo
+    current_time = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%H:%M")
     try:
         due_clients = db_clients.get_due_for_checkin(current_time)
     except Exception as e:
