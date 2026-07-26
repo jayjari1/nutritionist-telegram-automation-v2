@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["python311", "python311Packages.pip"]
+
+[phases.build]
+cmds = ["pip install -r nutricoach-telegram/requirements.txt"]
+
+[phases.run]
+cmd = "cd nutricoach-telegram && uvicorn api.webhook:app --host 0.0.0.0 --port $PORT"
