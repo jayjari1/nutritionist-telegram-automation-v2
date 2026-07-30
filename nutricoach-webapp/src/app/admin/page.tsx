@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, apiDelete } from "@/lib/api";
 import Navbar from "@/components/Navbar";
 
 interface Nutritionist {
@@ -96,6 +96,20 @@ export default function AdminPage() {
       setNutritionists(nutritionists.map((n) =>
         n.id === id ? { ...n, status: "active" } : n
       ));
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!adminToken) return;
+    try {
+      const result = await apiDelete(`/admin/nutritionists/${id}`, adminToken);
+      setNutritionists(nutritionists.filter((n) => n.id !== id));
+      setDeleteConfirm(null);
+      alert(`${name} and all their data has been permanently deleted.`);
     } catch (err: any) {
       alert(err.message);
     }
@@ -251,6 +265,12 @@ export default function AdminPage() {
                               Reactivate
                             </button>
                           )}
+                          <button
+                            onClick={() => setDeleteConfirm(nut.id)}
+                            className="text-xs bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition-colors font-medium"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -261,6 +281,50 @@ export default function AdminPage() {
           )}
         </div>
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Permanently Delete?</h3>
+              <p className="text-sm text-gray-500 mt-2">
+                This will permanently delete <strong>{nutritionists.find(n => n.id === deleteConfirm)?.full_name}</strong> and ALL their data including:
+              </p>
+              <ul className="text-sm text-gray-500 mt-2 text-left list-disc list-inside space-y-1">
+                <li>All clients</li>
+                <li>All chat messages</li>
+                <li>All check-in records</li>
+                <li>All AI rules</li>
+                <li>All pending queries</li>
+              </ul>
+              <p className="text-xs text-red-600 mt-3 font-medium">This action cannot be undone.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const nut = nutritionists.find(n => n.id === deleteConfirm);
+                  if (nut) handleDelete(deleteConfirm, nut.full_name);
+                }}
+                className="flex-1 bg-red-600 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-red-700 transition-colors"
+              >
+                Yes, Delete Everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

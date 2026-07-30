@@ -102,6 +102,72 @@ def reactivate_nutritionist(nutritionist_id: str, user: dict = Depends(require_a
     return {"message": f"{nut['full_name']} reactivated"}
 
 
+@router.delete("/nutritionists/{nutritionist_id}")
+def delete_nutritionist(nutritionist_id: str, user: dict = Depends(require_admin)):
+    """
+    Permanently delete a nutritionist and ALL their data:
+    - All clients
+    - All checkins
+    - All messages
+    - All pending queries
+    - All AI rules
+    - All notification logs
+    - The nutritionist record itself
+    """
+    # 1. Check nutritionist exists
+    existing = (
+        supabase.table("nutritionists")
+        .select("*")
+        .eq("id", nutritionist_id)
+        .execute()
+    )
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Nutritionist not found")
+
+    nut = existing.data[0]
+    nut_name = nut["full_name"]
+
+    # 2. Get all client IDs for this nutritionist
+    clients_res = (
+        supabase.table("clients")
+        .select("id")
+        .eq("nutritionist_id", nutritionist_id)
+        .execute()
+    )
+    client_ids = [c["id"] for c in (clients_res.data or [])]
+
+    # 3. Delete in correct order (manual cleanup for tables without cascade from nutritionist)
+
+    # Delete pending_queries where nutritionist_id matches (no cascade on this FK)
+    supabase.table("pending_queries").delete().eq("nutritionist_id", nutritionist_id).execute()
+
+    # Delete notification_log for these clients
+    for cid in client_ids:
+        supabase.table("notification_log").delete().eq("recipient_id", cid).execute()
+
+    # Delete checkins for these clients (has cascade, but being safe)
+    for cid in client_ids:
+        supabase.table("checkins").delete().eq("client_id", cid).execute()
+
+    # Delete messages for these clients (has cascade, but being safe)
+    for cid in client_ids:
+        supabase.table("messages").delete().eq("client_id", cid).execute()
+
+    # Delete AI rules for this nutritionist (has cascade, but being safe)
+    supabase.table("ai_rules").delete().eq("nutritionist_id", nutritionist_id).execute()
+
+    # Delete all clients for this nutritionist (has cascade on nutritionist_id)
+    supabase.table("clients").delete().eq("nutritionist_id", nutritionist_id).execute()
+
+    # 4. Finally delete the nutritionist
+    supabase.table("nutritionists").delete().eq("id", nutritionist_id).execute()
+
+    return {
+        "message": f"{nut_name} and all associated data permanently deleted",
+        "deleted_clients": len(client_ids),
+    }
+
+
 @router.get("/stats")
 def get_platform_stats(user: dict = Depends(require_admin)):
     """Get platform-wide statistics."""
