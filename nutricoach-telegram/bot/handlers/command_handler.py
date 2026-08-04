@@ -201,17 +201,19 @@ async def list_clients(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def join_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    /join <CODE> — Nutritionist links group to a client. Silent command.
+    /join <CODE> — Nutritionist links group to a client.
     """
     sender_id = update.message.from_user.id
     group_id = update.message.chat.id
 
     nutritionist = db_nutritionists.get_by_telegram_id(sender_id)
     if not nutritionist:
-        return  # Silent
+        await update.message.reply_text("Only nutritionists can use this command.")
+        return
 
     if not context.args:
-        return  # Silent
+        await update.message.reply_text("Usage: /join <CODE>\nGet the code from your dashboard when you add a client.")
+        return
 
     code = context.args[0].strip().upper()
 
@@ -219,14 +221,25 @@ async def join_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     client = find_by_code(code)
 
     if not client:
-        return  # Silent
+        await update.message.reply_text(f"Invalid code: {code}\nPlease check the code from your dashboard.")
+        return
 
     if client.get("telegram_group_id") and client["telegram_group_id"] != group_id:
-        return  # Silent
+        await update.message.reply_text("This code is already linked to a different group.")
+        return
 
     db_clients.update(client["id"], {"telegram_group_id": group_id})
 
-    # No response - silent command
+    await update.message.reply_text(
+        f"Setup complete!\n\n"
+        f"Client: {client['full_name']}\n"
+        f"Group linked successfully.\n\n"
+        f"Next steps:\n"
+        f"1. Client sends /setclient to identify themselves\n"
+        f"2. Optional: Caretaker sends /setcaretaker\n"
+        f"3. Bot will start daily check-ins at the scheduled time"
+    )
+
     print(f"[LINKED] Nutritionist linked group to {client['full_name']}")
 
 
