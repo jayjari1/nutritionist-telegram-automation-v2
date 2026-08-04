@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPost, apiPatch } from "@/lib/api";
 import Navbar from "@/components/Navbar";
 
 interface Client {
@@ -39,11 +39,14 @@ function getInviteCode(clientId: string): string {
 }
 
 export default function DashboardPage() {
-  const { user, token, loading } = useAuth();
+  const { user, token, loading, login } = useAuth();
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [loadingClients, setLoadingClients] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [telegramId, setTelegramId] = useState("");
+  const [linkingTelegram, setLinkingTelegram] = useState(false);
+  const [telegramLinked, setTelegramLinked] = useState(false);
   const [newClient, setNewClient] = useState({
     full_name: "",
     program_type: "General Nutrition",
@@ -55,6 +58,24 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!loading && !token) router.push("/auth/login");
   }, [loading, token, router]);
+
+  const handleLinkTelegram = async () => {
+    if (!token || !telegramId.trim()) return;
+    setLinkingTelegram(true);
+    try {
+      await apiPatch("/auth/link-telegram", { telegram_user_id: parseInt(telegramId) }, token);
+      // Update user in localStorage so banner disappears
+      if (user) {
+        const updatedUser = { ...user, telegram_user_id: parseInt(telegramId) };
+        login(token, updatedUser);
+      }
+      setTelegramLinked(true);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLinkingTelegram(false);
+    }
+  };
 
   useEffect(() => {
     if (token) {
@@ -87,10 +108,50 @@ export default function DashboardPage() {
 
   if (loading || !token) return null;
 
+  const showTelegramBanner = !user?.telegram_user_id && !telegramLinked;
+
   return (
     <>
       <Navbar />
       <main className="pb-20">
+        {/* Telegram Linking Banner */}
+        {showTelegramBanner && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
+            <div className="flex items-start gap-3">
+              <span className="text-amber-600 text-lg mt-0.5">⚠️</span>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-900">Link your Telegram account</p>
+                <p className="text-xs text-amber-700 mt-1">
+                  To use bot commands, enter your Telegram ID. Get it by messaging{" "}
+                  <a href="https://t.me/userinfobot" target="_blank" className="underline font-medium">@userinfobot</a>{" "}
+                  on Telegram.
+                </p>
+                <div className="flex gap-2 mt-2">
+                  <input
+                    type="number"
+                    value={telegramId}
+                    onChange={(e) => setTelegramId(e.target.value)}
+                    placeholder="Your Telegram ID (e.g. 6159056602)"
+                    className="flex-1 rounded-lg border border-amber-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <button
+                    onClick={handleLinkTelegram}
+                    disabled={linkingTelegram || !telegramId.trim()}
+                    className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 active:scale-95 transition-transform"
+                  >
+                    {linkingTelegram ? "Linking..." : "Link"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {telegramLinked && (
+          <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-3">
+            <p className="text-sm text-emerald-800 font-medium">✅ Telegram account linked! You can now use bot commands.</p>
+          </div>
+        )}
         {/* Header Section */}
         <div className="bg-white border-b border-gray-100 px-4 py-4">
           <div className="flex items-center justify-between">

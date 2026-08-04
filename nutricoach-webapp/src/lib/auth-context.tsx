@@ -17,6 +17,7 @@ interface User {
   clinic_name?: string;
   status: string;
   role: string;
+  telegram_user_id?: number;
 }
 
 interface AuthContextType {

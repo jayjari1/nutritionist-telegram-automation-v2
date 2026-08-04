@@ -72,6 +72,7 @@ def login(req: LoginRequest):
             "email": user["email"],
             "clinic_name": user.get("clinic_name"),
             "status": user["status"],
+            "telegram_user_id": user.get("telegram_user_id"),
         },
     }
 
@@ -161,4 +162,21 @@ def get_me(user: dict = Depends(get_current_user)):
         "clinic_name": user.get("clinic_name"),
         "status": user.get("status"),
         "role": user.get("_role"),
+        "telegram_user_id": user.get("telegram_user_id"),
     }
+
+
+class LinkTelegramRequest(BaseModel):
+    telegram_user_id: int
+
+
+@router.patch("/link-telegram")
+def link_telegram(req: LinkTelegramRequest, user: dict = Depends(get_current_user)):
+    """Link a nutritionist's web account to their Telegram account."""
+    if user.get("_role") != "nutritionist":
+        raise HTTPException(status_code=403, detail="Only nutritionists can link Telegram")
+
+    from db.nutritionists import update
+    update(user["id"], {"telegram_user_id": req.telegram_user_id})
+
+    return {"message": "Telegram account linked successfully", "telegram_user_id": req.telegram_user_id}

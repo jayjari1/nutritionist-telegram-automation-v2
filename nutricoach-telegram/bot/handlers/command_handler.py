@@ -204,11 +204,20 @@ async def join_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     /join <CODE> — Nutritionist links group to a client.
     """
     sender_id = update.message.from_user.id
+    sender_name = update.message.from_user.full_name
     group_id = update.message.chat.id
 
+    print(f"[DEBUG /join] sender_id={sender_id}, sender_name={sender_name}, group_id={group_id}")
+
     nutritionist = db_nutritionists.get_by_telegram_id(sender_id)
+    print(f"[DEBUG /join] nutritionist found: {nutritionist}")
+
     if not nutritionist:
-        await update.message.reply_text("Only nutritionists can use this command.")
+        await update.message.reply_text(
+            f"Only nutritionists can use this command.\n\n"
+            f"Your Telegram ID: {sender_id}\n"
+            f"If you are a nutritionist, ask admin to link your Telegram ID."
+        )
         return
 
     if not context.args:
@@ -252,6 +261,8 @@ async def set_client(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     sender_id = update.message.from_user.id
     sender_name = update.message.from_user.full_name
     group_id = update.message.chat.id
+
+    print(f"[DEBUG /setclient] sender_id={sender_id}, sender_name={sender_name}, group_id={group_id}")
 
     try:
         client = db_clients.get_by_group_id(group_id)
