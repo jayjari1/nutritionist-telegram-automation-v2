@@ -113,8 +113,12 @@ def main():
             webhook_url=WEBHOOK_URL,
         )
     else:
-        logger.info("Development mode — starting polling...")
-        app.run_polling(allowed_updates=["message", "callback_query"])
+        logger.info("Starting polling...")
+        # drop_pending_updates=True ensures old bot instance's updates are ignored
+        app.run_polling(
+            allowed_updates=["message", "callback_query"],
+            drop_pending_updates=True,
+        )
 
 
 if __name__ == "__main__":
