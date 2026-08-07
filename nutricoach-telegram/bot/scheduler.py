@@ -12,6 +12,9 @@ import asyncio
 from datetime import datetime, date, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from logger import get_logger
+logger = get_logger("bot.scheduler")
+
 import db.clients as db_clients
 import db.checkins as db_checkins
 import db.nutritionists as db_nutritionists
@@ -63,7 +66,7 @@ def init_scheduler(bot) -> AsyncIOScheduler:
     )
 
     scheduler.start()
-    print("✅ Scheduler started — daily check-ins, weekly summaries, expiry checks active.")
+    logger.info("Scheduler started — daily check-ins, weekly summaries, expiry checks active.")
     return scheduler
 
 
@@ -82,7 +85,7 @@ async def _send_due_checkins():
     try:
         due_clients = db_clients.get_due_for_checkin(current_time)
     except Exception as e:
-        print(f"❌ Failed to fetch due check-ins: {e}")
+        logger.error(f"Failed to fetch due check-ins: {e}")
         return
 
     for client in due_clients:
@@ -98,7 +101,7 @@ async def _send_due_checkins():
 
             group_id = client.get("telegram_group_id")
             if not group_id:
-                print(f"⚠️ Client {client['full_name']} has no group ID — skipping check-in")
+                logger.warning(f"Client {client['full_name']} has no group ID — skipping check-in")
                 continue
 
             message = _build_checkin_message(client)
@@ -107,10 +110,10 @@ async def _send_due_checkins():
             # Create blank check-in record for today
             db_checkins.create_today(client["id"])
 
-            print(f"✅ Check-in sent to {client['full_name']} at {current_time}")
+            logger.info(f"Check-in sent to {client['full_name']} at {current_time}")
 
         except Exception as e:
-            print(f"❌ Failed to send check-in to {client.get('full_name', 'Unknown')}: {e}")
+            logger.error(f"Failed to send check-in to {client.get('full_name', 'Unknown')}: {e}")
 
 
 def _build_checkin_message(client: dict) -> str:
@@ -151,7 +154,7 @@ async def _send_weekly_summaries():
         res = supabase.table("clients").select("*").eq("status", "active").execute()
         all_clients = res.data or []
     except Exception as e:
-        print(f"❌ Failed to fetch active clients for weekly summaries: {e}")
+        logger.error(f"Failed to fetch active clients for weekly summaries: {e}")
         return
 
     for client in all_clients:
@@ -170,10 +173,10 @@ async def _send_weekly_summaries():
             summary = gemini.generate_weekly_summary(client, nutritionist, stats, checkins)
             await _bot.send_message(chat_id=group_id, text=summary)
 
-            print(f"📊 Weekly summary sent to {client['full_name']}")
+            logger.info(f"Weekly summary sent to {client['full_name']}")
 
         except Exception as e:
-            print(f"❌ Failed to send weekly summary to {client.get('full_name', 'Unknown')}: {e}")
+            logger.error(f"Failed to send weekly summary to {client.get('full_name', 'Unknown')}: {e}")
 
 
 # ── Job 3: Expiry Checking ────────────────────────────────────────────────────
@@ -195,7 +198,7 @@ async def _check_expirations():
         # Find clients expiring in exactly 3 days
         expiring_3 = db_clients.get_expiring_soon(days_threshold=3)
     except Exception as e:
-        print(f"❌ Failed to fetch expiring clients: {e}")
+        logger.error(f"Failed to fetch expiring clients: {e}")
         expiring_7 = []
         expiring_3 = []
 
@@ -221,7 +224,7 @@ async def _check_expirations():
         )
         expired_clients = res.data or []
     except Exception as e:
-        print(f"❌ Failed to fetch expired clients: {e}")
+        logger.error(f"Failed to fetch expired clients: {e}")
         expired_clients = []
 
     for client in expired_clients:
@@ -238,8 +241,8 @@ async def _check_expirations():
                     )
                 )
             except Exception as e:
-                print(f"❌ Could not send expiry message: {e}")
-        print(f"🔴 Auto-expired: {client['full_name']}")
+                logger.error(f"Could not send expiry message: {e}")
+        logger.info(f"Auto-expired: {client['full_name']}")
 
 
 async def _send_expiry_warning(client: dict, days_left: int):
@@ -259,6 +262,6 @@ async def _send_expiry_warning(client: dict, days_left: int):
             ),
             parse_mode="Markdown"
         )
-        print(f"⚠️ Expiry warning ({days_left} days) sent to {client['full_name']}")
+        logger.info(f"Expiry warning ({days_left} days) sent to {client['full_name']}")
     except Exception as e:
-        print(f"❌ Could not send expiry warning: {e}")
+        logger.error(f"Could not send expiry warning: {e}")

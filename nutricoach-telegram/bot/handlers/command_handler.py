@@ -7,6 +7,9 @@ Handles Telegram commands for setup and management.
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from logger import get_logger
+logger = get_logger("bot.command_handler")
+
 import db.clients as db_clients
 import db.nutritionists as db_nutritionists
 import db.checkins as db_checkins
@@ -18,7 +21,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         client = db_clients.get_by_group_id(group_id)
     except Exception as e:
-        print(f"[DEBUG] start() DB error: {type(e).__name__}: {e}")
+        logger.error(f"start() DB error: {type(e).__name__}: {e}")
         return
 
     if not client:
@@ -207,10 +210,10 @@ async def join_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     sender_name = update.message.from_user.full_name
     group_id = update.message.chat.id
 
-    print(f"[DEBUG /join] sender_id={sender_id}, sender_name={sender_name}, group_id={group_id}")
+    logger.info(f"/join: sender_id={sender_id}, sender_name={sender_name}, group_id={group_id}")
 
     nutritionist = db_nutritionists.get_by_telegram_id(sender_id)
-    print(f"[DEBUG /join] nutritionist found: {nutritionist}")
+    logger.info(f"/join: nutritionist found: {nutritionist}")
 
     if not nutritionist:
         await update.message.reply_text(
@@ -249,7 +252,7 @@ async def join_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         f"3. Bot will start daily check-ins at the scheduled time"
     )
 
-    print(f"[LINKED] Nutritionist linked group to {client['full_name']}")
+    logger.info(f"Nutritionist linked group to {client['full_name']}")
 
 
 async def set_client(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -262,7 +265,7 @@ async def set_client(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     sender_name = update.message.from_user.full_name
     group_id = update.message.chat.id
 
-    print(f"[DEBUG /setclient] sender_id={sender_id}, sender_name={sender_name}, group_id={group_id}")
+    logger.info(f"/setclient: sender_id={sender_id}, sender_name={sender_name}, group_id={group_id}")
 
     try:
         client = db_clients.get_by_group_id(group_id)
@@ -295,7 +298,7 @@ async def set_client(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         f"The AI will respond to your messages."
     )
 
-    print(f"[CLIENT] {sender_name} ({sender_id}) set as client for {client['full_name']}")
+    logger.info(f"{sender_name} ({sender_id}) set as client for {client['full_name']}")
 
 
 async def set_caretaker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -341,7 +344,7 @@ async def set_caretaker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         f"Your messages will be logged as care notes."
     )
 
-    print(f"[CARETAKER] {sender_name} ({sender_id}) set as caretaker for {client['full_name']}")
+    logger.info(f"{sender_name} ({sender_id}) set as caretaker for {client['full_name']}")
 
 
 async def remove_caretaker(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -370,7 +373,7 @@ async def remove_caretaker(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     })
 
     # No response - silent command
-    print(f"[CARETAKER] Removed caretaker for {client['full_name']}")
+    logger.info(f"Removed caretaker for {client['full_name']}")
 
 
 async def reset_roles(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -397,7 +400,7 @@ async def reset_roles(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     })
 
     # No response - silent command
-    print(f"[RESET] Cleared client and caretaker for {client['full_name']}")
+    logger.info(f"Cleared client and caretaker for {client['full_name']}")
 
 
 async def test_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -440,7 +443,7 @@ async def test_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
     await update.message.reply_text(message, parse_mode="Markdown")
-    print(f"[TEST] Manual check-in sent to {client['full_name']}")
+    logger.info(f"Manual check-in sent to {client['full_name']}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

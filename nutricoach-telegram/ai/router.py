@@ -6,6 +6,9 @@ Takes a client message, loads all context, calls AI, and returns a decision.
 This is the single function called for EVERY client message.
 """
 
+from logger import get_logger
+logger = get_logger("ai.router")
+
 import db.clients as db_clients
 import db.nutritionists as db_nutritionists
 import db.messages as db_messages
@@ -37,11 +40,15 @@ def route(client_id: str, message_text: str, telegram_msg_id: int = None, sender
 
     client = db_clients.get_by_id(client_id)
     if not client:
+        logger.warning(f"Client not found: {client_id}")
         return {"action": "handle", "reply": "Hi! I'm having trouble finding your profile. Please contact support.", "adherence": None, "energy_level": None}
 
     nutritionist = db_nutritionists.get_by_id(client["nutritionist_id"])
     if not nutritionist:
+        logger.warning(f"Nutritionist not found for client: {client_id}")
         return {"action": "handle", "reply": "Hi! I'm having a configuration issue. Please contact your doctor.", "adherence": None, "energy_level": None}
+
+    logger.info(f"Processing message from {sender_role} for client {client['full_name']}")
 
     # ── Step 2: Load AI rules ─────────────────────────────────────────────────
 
@@ -72,6 +79,8 @@ def route(client_id: str, message_text: str, telegram_msg_id: int = None, sender
         history_text=history_text,
         new_message=message_text,
     )
+
+    logger.info(f"AI result: action={result['action']}, adherence={result['adherence']}")
 
     # ── Step 6: Handle result ─────────────────────────────────────────────────
 
@@ -111,6 +120,7 @@ def route(client_id: str, message_text: str, telegram_msg_id: int = None, sender
             ai_interim_reply=result["reply"],
         )
         query_id = query["id"]
+        logger.info(f"Query escalated: {query_id}")
 
         # Update checkin to show no_response (AI couldn't classify due to escalation)
         db_checkins.update_today(

@@ -41,6 +41,9 @@ IS_PRODUCTION = APP_ENV == "production"
 # ── Validate required keys on startup ────────────────────────────────────────
 def validate_config():
     """Call this at startup to catch missing keys early."""
+    from logger import get_logger
+    logger = get_logger("config")
+    
     required = {
         "TELEGRAM_BOT_TOKEN": TELEGRAM_BOT_TOKEN,
         "SUPABASE_URL": SUPABASE_URL,
@@ -51,7 +54,7 @@ def validate_config():
     missing = [k for k, v in required.items() if not v]
     if missing:
         raise EnvironmentError(
-            f"❌ Missing required environment variables: {', '.join(missing)}\n"
-            f"   Copy .env.example to .env and fill in the values."
+            f"Missing required environment variables: {', '.join(missing)}\n"
+            f"Copy .env.example to .env and fill in the values."
         )
-    print("✅ Config validated — all required keys present.")
+    logger.info("Config validated — all required keys present.")

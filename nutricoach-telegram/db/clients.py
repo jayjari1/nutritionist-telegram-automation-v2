@@ -7,6 +7,9 @@ All database operations for the clients table.
 from db.client import supabase
 from typing import Optional
 from datetime import date, time, timedelta
+from logger import get_logger
+
+logger = get_logger("db.clients")
 
 
 def get_by_id(client_id: str) -> Optional[dict]:
@@ -30,7 +33,7 @@ def get_by_telegram_user_id(telegram_user_id: int) -> Optional[dict]:
 
 def get_by_group_id(group_id: int) -> Optional[dict]:
     """Fetch a client by their Telegram group chat ID."""
-    print(f"[DEBUG] get_by_group_id({group_id}) - querying Supabase...")
+    logger.debug(f"get_by_group_id({group_id}) - querying Supabase...")
     res = (
         supabase.table("clients")
         .select("*")
@@ -38,7 +41,7 @@ def get_by_group_id(group_id: int) -> Optional[dict]:
         .execute()
     )
     data = res.data or []
-    print(f"[DEBUG] get_by_group_id result: {len(data)} rows")
+    logger.debug(f"get_by_group_id result: {len(data)} rows")
     return data[0] if data else None
 
 

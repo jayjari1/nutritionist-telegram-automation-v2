@@ -12,6 +12,9 @@ from typing import Optional
 
 from api.middleware import get_current_user
 from db.client import supabase
+from logger import get_logger
+
+logger = get_logger("api.queries")
 
 router = APIRouter()
 
@@ -121,10 +124,10 @@ def resolve_query(
                     }
                     resp = requests.post(url, json=payload, timeout=10)
                     if resp.ok:
-                        print(f"[REPLY] Doctor replied to {client_name} in group {group_id}")
+                        logger.info(f"Doctor replied to {client_name} in group {group_id}")
                     else:
-                        print(f"[REPLY] Telegram API error: {resp.text}")
+                        logger.error(f"Telegram API error: {resp.text}")
             except Exception as e:
-                print(f"Failed to notify Telegram group: {e}")
+                logger.error(f"Failed to notify Telegram group: {e}")
 
     return {"message": "Query resolved"}

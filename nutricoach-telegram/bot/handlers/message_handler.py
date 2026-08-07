@@ -8,6 +8,9 @@ Identifies sender role and routes accordingly.
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from logger import get_logger
+logger = get_logger("bot.message_handler")
+
 import db.clients as db_clients
 import db.nutritionists as db_nutritionists
 import db.messages as db_messages
@@ -38,7 +41,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Find the client for this group
     try:
         client = db_clients.get_by_group_id(group_id)
-    except Exception:
+    except Exception as e:
+        logger.error(f"DB error in get_by_group_id: {e}")
         return
     if not client:
         return
@@ -67,8 +71,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     chat_id=sender_id,
                     text=f"Resolved query for {client['full_name']}: \"{resolved_query.get('client_message', '')[:100]}\"",
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to send auto-resolve notification: {e}")
         return
 
     # ── CARETAKER: Log and respond with AI ─────────────────────────────────
@@ -98,6 +102,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 sender_role="caretaker",
             )
         except Exception as e:
+            logger.error(f"AI router error for caretaker message: {e}")
             return
 
         # Send AI reply
@@ -123,6 +128,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 sender_role="client",
             )
         except Exception as e:
+            logger.error(f"AI router error for client message: {e}")
             await msg.reply_text("Sorry, I'm having trouble processing that right now. Please try again.")
             return
 
@@ -136,5 +142,5 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     chat_id=result["nutritionist_telegram_id"],
                     text=f"Pending Query — {result['client_name']}\n\nClient asked: {message_text}\n\nPlease review in the group.",
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to send escalation notification: {e}")

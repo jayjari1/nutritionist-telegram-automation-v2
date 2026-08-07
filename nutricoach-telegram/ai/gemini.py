@@ -8,6 +8,9 @@ Builds the full dynamic prompt and returns a structured response.
 import json
 import google.generativeai as genai
 from config import GEMINI_API_KEY, GEMINI_MODEL
+from logger import get_logger
+
+logger = get_logger("ai.gemini")
 
 # Configure Gemini on import
 genai.configure(api_key=GEMINI_API_KEY)
@@ -120,7 +123,7 @@ def evaluate(client: dict, nutritionist: dict, rules_text: str, history_text: st
 
     except json.JSONDecodeError:
         # If Gemini returns something unparseable, default to a safe escalation
-        print(f"⚠️ Gemini returned non-JSON response. Defaulting to escalation.")
+        logger.warning("Gemini returned non-JSON response. Defaulting to escalation.")
         return {
             "action": "escalate",
             "adherence": None,
@@ -130,7 +133,7 @@ def evaluate(client: dict, nutritionist: dict, rules_text: str, history_text: st
         }
 
     except Exception as e:
-        print(f"❌ Gemini API error: {e}")
+        logger.error(f"Gemini API error: {e}")
         return {
             "action": "escalate",
             "adherence": None,

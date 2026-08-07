@@ -15,6 +15,11 @@ import os
 # Add project root to path so all imports work correctly
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from logger import setup_logging, get_logger
+logger = get_logger("bot.main")
+
+from sentry_init import init_sentry
+
 from telegram.ext import (
     Application,
     MessageHandler,
@@ -48,7 +53,12 @@ GROUP_FILTER = filters.ChatType.GROUPS
 
 def main():
     """Starts the bot and all background services."""
-    print("NutriCoach Bot starting...")
+    # Set up logging first
+    setup_logging()
+    logger.info("NutriCoach Bot starting...")
+
+    # Initialize Sentry error tracking
+    init_sentry()
 
     # Validate all required environment variables are set
     validate_config()
@@ -88,7 +98,7 @@ def main():
         handle_message,
     ))
 
-    print("✅ All handlers registered.")
+    logger.info("All handlers registered.")
 
     # ── Start Scheduler ───────────────────────────────────────────────────────
     # Pass the bot instance to the scheduler so it can send messages
@@ -96,17 +106,36 @@ def main():
 
     # ── Start Polling or Webhook ──────────────────────────────────────────────
     if IS_PRODUCTION and WEBHOOK_URL:
-        print(f"🌐 Production mode — starting webhook at {WEBHOOK_URL}")
+        logger.info(f"Production mode — starting webhook at {WEBHOOK_URL}")
         app.run_webhook(
             listen="0.0.0.0",
             port=PORT,
             webhook_url=WEBHOOK_URL,
         )
     else:
-        print("🔄 Development mode — starting polling...")
-        print("   Bot is running. Press Ctrl+C to stop.\n")
+        logger.info("Development mode — starting polling...")
         app.run_polling(allowed_updates=["message", "callback_query"])
 
 
 if __name__ == "__main__":
-    main()
+    # Wrap main() in try/except for error recovery
+    import time
+    
+    MAX_RETRIES = 5
+    RETRY_DELAY = 10  # seconds
+    
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            main()
+            break  # If main() exits normally, break the loop
+        except KeyboardInterrupt:
+            logger.info("Bot stopped by user (Ctrl+C)")
+            break
+        except Exception as e:
+            logger.error(f"Bot crashed on attempt {attempt}/{MAX_RETRIES}: {e}")
+            if attempt < MAX_RETRIES:
+                logger.info(f"Restarting in {RETRY_DELAY} seconds...")
+                time.sleep(RETRY_DELAY)
+            else:
+                logger.critical("Max retries reached. Bot shutting down permanently.")
+                raise

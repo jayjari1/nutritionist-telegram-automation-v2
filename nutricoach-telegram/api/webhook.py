@@ -11,11 +11,18 @@ import os
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from logger import setup_logging, get_logger
+from sentry_init import init_sentry
 from config import PORT
 from api.routes import auth, clients, checkins, queries, rules, admin, messages, config
+
+# Initialize logging and Sentry
+setup_logging()
+logger = get_logger("api.webhook")
+init_sentry()
 
 app = FastAPI(
     title="NutriCoach API",
@@ -50,4 +57,29 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    """Detailed health check — verifies database connectivity."""
+    from datetime import datetime
+    checks = {
+        "api": "ok",
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+    # Check database connectivity
+    try:
+        from db.client import supabase
+        supabase.table("nutritionists").select("id").limit(1).execute()
+        checks["database"] = "ok"
+    except Exception as e:
+        checks["database"] = f"error: {str(e)[:100]}"
+        logger.error(f"Health check — database error: {e}")
+
+    # Check if all critical env vars are set
+    from config import TELEGRAM_BOT_TOKEN, SUPABASE_URL, GEMINI_API_KEY
+    checks["config"] = "ok" if all([TELEGRAM_BOT_TOKEN, SUPABASE_URL, GEMINI_API_KEY]) else "incomplete"
+
+    overall_status = "ok" if checks.get("database") == "ok" else "degraded"
+
+    return {
+        "status": overall_status,
+        **checks
+    }
